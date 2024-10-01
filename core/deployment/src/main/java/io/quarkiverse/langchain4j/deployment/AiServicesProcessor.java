@@ -61,6 +61,7 @@ import org.objectweb.asm.tree.analysis.AnalyzerException;
 import dev.langchain4j.exception.IllegalConfigurationException;
 import dev.langchain4j.service.Moderate;
 import dev.langchain4j.service.output.ServiceOutputParser;
+import dev.langchain4j.service.tool.ToolProvider;
 import io.quarkiverse.langchain4j.ModelName;
 import io.quarkiverse.langchain4j.ToolBox;
 import io.quarkiverse.langchain4j.deployment.config.LangChain4jBuildConfig;
@@ -323,6 +324,13 @@ public class AiServicesProcessor {
                 validateSupplierAndRegisterForReflection(moderationModelSupplierClassName, index, reflectiveClassProducer);
             }
 
+            DotName toolProviderSupplierClassName = null;
+            AnnotationValue toolProviderSupplierValue = instance.value("toolProvider");
+            if (toolProviderSupplierValue != null) {
+                toolProviderSupplierClassName = toolProviderSupplierValue.asClass().name();
+                validateSupplierAndRegisterForReflection(toolProviderSupplierClassName, index, reflectiveClassProducer);
+            }
+
             DotName imageModelSupplierClassName = LangChain4jDotNames.BEAN_IF_EXISTS_IMAGE_MODEL_SUPPLIER;
             AnnotationValue imageModelSupplierValue = instance.value("imageModelSupplier");
             if (imageModelSupplierValue != null) {
@@ -381,7 +389,7 @@ public class AiServicesProcessor {
                             cdiScope,
                             chatModelName,
                             moderationModelName,
-                            imageModelName));
+                            toolProviderSupplierClassName));
         }
 
         for (String chatModelName : chatModelNames) {
@@ -462,6 +470,7 @@ public class AiServicesProcessor {
         boolean needsModerationModelBean = false;
         boolean needsImageModelBean = false;
         Set<DotName> allToolNames = new HashSet<>();
+        Set<DotName> allToolProviders = new HashSet<>();
 
         for (DeclarativeAiServiceBuildItem bi : declarativeAiServiceItems) {
             ClassInfo declarativeAiServiceClassInfo = bi.getServiceClassInfo();
@@ -476,6 +485,10 @@ public class AiServicesProcessor {
                     : null);
 
             List<String> toolClassNames = bi.getToolDotNames().stream().map(DotName::toString).collect(Collectors.toList());
+
+            String toolProviderSupplierClassName = (bi.getToolProviderClassDotName() != null
+                    ? bi.getToolProviderClassDotName().toString()
+                    : null);
 
             String chatMemoryProviderSupplierClassName = bi.getChatMemoryProviderSupplierClassDotName() != null
                     ? bi.getChatMemoryProviderSupplierClassDotName().toString()
@@ -556,7 +569,9 @@ public class AiServicesProcessor {
                                     serviceClassName,
                                     chatLanguageModelSupplierClassName,
                                     streamingChatLanguageModelSupplierClassName,
-                                    toolClassNames, chatMemoryProviderSupplierClassName, retrieverClassName,
+                                    toolClassNames,
+                                    toolProviderSupplierClassName,
+                                    chatMemoryProviderSupplierClassName, retrieverClassName,
                                     retrievalAugmentorSupplierClassName,
                                     auditServiceClassSupplierName,
                                     moderationModelSupplierClassName,
@@ -668,6 +683,12 @@ public class AiServicesProcessor {
                 needsImageModelBean = true;
             }
 
+            if (toolProviderSupplierClassName != null) {
+                DotName toolProvider = DotName.createSimple(toolProviderSupplierClassName);
+                configurator.addInjectionPoint(ClassType.create(toolProvider));
+                allToolProviders.add(toolProvider);
+            }
+
             configurator
                     .addInjectionPoint(ParameterizedType.create(DotNames.CDI_INSTANCE,
                             new Type[] { ClassType.create(OutputGuardrail.class) }, null))
@@ -699,6 +720,9 @@ public class AiServicesProcessor {
         }
         if (needsImageModelBean) {
             unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(LangChain4jDotNames.IMAGE_MODEL));
+        }
+        if (!allToolProviders.isEmpty()) {
+            unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(DotName.createSimple(ToolProvider.class)));
         }
         if (!allToolNames.isEmpty()) {
             unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(allToolNames));
