@@ -18,6 +18,9 @@ import dev.langchain4j.model.moderation.ModerationModel;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.tool.ToolProvider;
+import dev.langchain4j.service.tool.ToolProviderRequest;
+import dev.langchain4j.service.tool.ToolProviderResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -139,6 +142,8 @@ public @interface RegisterAiService {
      */
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
+    Class<? extends ToolProvider> toolProvider() default BeanIfExistsToolProviderSupplier.class;
+
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
      * any of the extensions providing such capability (such as {@code quarkus-langchain4j-openai} and
@@ -246,6 +251,14 @@ public @interface RegisterAiService {
 
         @Override
         public ModerationModel get() {
+            throw new UnsupportedOperationException("should never be called");
+        }
+    }
+
+    final class BeanIfExistsToolProviderSupplier implements ToolProvider {
+
+        @Override
+        public ToolProviderResult provideTools(ToolProviderRequest request) {
             throw new UnsupportedOperationException("should never be called");
         }
     }

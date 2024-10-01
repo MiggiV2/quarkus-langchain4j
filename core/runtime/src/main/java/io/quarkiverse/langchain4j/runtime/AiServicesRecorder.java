@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import dev.langchain4j.service.tool.ToolProvider;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.util.TypeLiteral;
 
@@ -157,6 +158,13 @@ public class AiServicesRecorder {
                         quarkusAiServices.tools(tools);
                     }
 
+                    if(info.toolProvider() != null){
+                        // add ToolProvider here
+                        ToolProvider toolProvider = (ToolProvider) Thread
+                            .currentThread().getContextClassLoader().loadClass(info.toolProvider())
+                            .getConstructor().newInstance();
+                        quarkusAiServices.toolProvider(toolProvider);
+                    }
                     if (info.chatMemoryProviderSupplierClassName() != null) {
                         if (RegisterAiService.BeanChatMemoryProviderSupplier.class.getName()
                                 .equals(info.chatMemoryProviderSupplierClassName())) {

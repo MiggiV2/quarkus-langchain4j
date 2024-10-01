@@ -320,6 +320,13 @@ public class AiServicesProcessor {
                 validateSupplierAndRegisterForReflection(moderationModelSupplierClassName, index, reflectiveClassProducer);
             }
 
+            DotName toolProviderSupplierClassName = LangChain4jDotNames.BEAN_IF_EXISTS_TOOL_PROVIDER_SUPPLIER;
+            AnnotationValue toolProviderSupplierValue = instance.value("toolProvider"); // Is this correct? or should it be toolProviderSupplier?
+            if (toolProviderSupplierValue != null) {
+                toolProviderSupplierClassName = toolProviderSupplierValue.asClass().name();
+                validateSupplierAndRegisterForReflection(toolProviderSupplierClassName, index, reflectiveClassProducer);
+            }
+
             // determine whether the method is annotated with @Moderate
             String moderationModelName = NamedConfigUtil.DEFAULT_NAME;
             for (MethodInfo method : declarativeAiServiceClassInfo.methods()) {
@@ -359,7 +366,9 @@ public class AiServicesProcessor {
                             determineChatMemorySeeder(declarativeAiServiceClassInfo, generatedClassOutput),
                             cdiScope,
                             chatModelName,
-                            moderationModelName));
+                            moderationModelName,
+                            // ToDo: Add toolProvider here
+                            toolProviderSupplierClassName));
         }
 
         for (String chatModelName : chatModelNames) {
@@ -435,6 +444,10 @@ public class AiServicesProcessor {
 
             List<String> toolClassNames = bi.getToolDotNames().stream().map(DotName::toString).collect(Collectors.toList());
 
+            String toolProviderSupplierClassName = (bi.getToolProviderClassDotName() != null
+                    ? bi.getToolProviderClassDotName().toString()
+                    : null);
+
             String chatMemoryProviderSupplierClassName = bi.getChatMemoryProviderSupplierClassDotName() != null
                     ? bi.getChatMemoryProviderSupplierClassDotName().toString()
                     : null;
@@ -499,7 +512,9 @@ public class AiServicesProcessor {
                                     serviceClassName,
                                     chatLanguageModelSupplierClassName,
                                     streamingChatLanguageModelSupplierClassName,
-                                    toolClassNames, chatMemoryProviderSupplierClassName, retrieverClassName,
+                                    toolClassNames,
+                                    toolProviderSupplierClassName,
+                                    chatMemoryProviderSupplierClassName, retrieverClassName,
                                     retrievalAugmentorSupplierClassName,
                                     auditServiceClassSupplierName,
                                     moderationModelSupplierClassName,
