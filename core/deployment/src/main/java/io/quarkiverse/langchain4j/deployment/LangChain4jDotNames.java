@@ -97,6 +97,9 @@ public class LangChain4jDotNames {
     static final DotName BEAN_IF_EXISTS_IMAGE_MODEL_SUPPLIER = DotName.createSimple(
             RegisterAiService.BeanIfExistsImageModelSupplier.class);
 
+    static final DotName BEAN_IF_EXISTS_TOOL_PROVIDER_SUPPLIER = DotName.createSimple(
+            RegisterAiService.BeanIfExistsToolProviderSupplier.class);
+
     static final DotName QUARKUS_AI_SERVICE_CONTEXT_QUALIFIER = DotName.createSimple(
             QuarkusAiServiceContextQualifier.class);
 

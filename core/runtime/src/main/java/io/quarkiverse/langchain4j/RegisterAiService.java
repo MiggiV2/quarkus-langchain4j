@@ -5,8 +5,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.Supplier;
+
+import jakarta.enterprise.context.ApplicationScoped;
 
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
@@ -19,6 +22,9 @@ import dev.langchain4j.model.moderation.ModerationModel;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.tool.ToolProvider;
+import dev.langchain4j.service.tool.ToolProviderRequest;
+import dev.langchain4j.service.tool.ToolProviderResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -140,6 +146,8 @@ public @interface RegisterAiService {
      */
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
+    Class<? extends ToolProvider> toolProvider() default BeanIfExistsToolProviderSupplier.class;
+
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
      * any of the extensions providing such capability (such as {@code quarkus-langchain4j-openai} and
@@ -260,6 +268,16 @@ public @interface RegisterAiService {
         @Override
         public ImageModel get() {
             throw new UnsupportedOperationException("should never be called");
+        }
+    }
+
+    @ApplicationScoped
+    final class BeanIfExistsToolProviderSupplier implements ToolProvider {
+
+        @Override
+        public ToolProviderResult provideTools(ToolProviderRequest request) {
+            // throw new UnsupportedOperationException("should never be called");
+            return new ToolProviderResult(new HashMap<>());
         }
     }
 }
