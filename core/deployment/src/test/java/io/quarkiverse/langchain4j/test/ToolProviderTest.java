@@ -1,5 +1,7 @@
 package io.quarkiverse.langchain4j.test;
 
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.service.tool.ToolProviderRequest;
 import dev.langchain4j.service.tool.ToolProviderResult;
@@ -12,13 +14,22 @@ import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import static dev.langchain4j.agent.tool.JsonSchemaProperty.type;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ToolProviderTest
 {
+	private static final Logger log = LoggerFactory.getLogger(ToolProviderTest.class);
+
 	@Inject
-	MyService myService;
+	MyServiceWithToolProvider myServiceWithTools;
+
+	@Inject
+	MyServiceWithoutToolProvider myServiceButNoTools;
 
 	@ApplicationScoped
 	public static class MyCustomToolProvider implements ToolProvider
@@ -26,11 +37,16 @@ public class ToolProviderTest
 		@Override
 		public ToolProviderResult provideTools(ToolProviderRequest request)
 		{
-			throw new EmptyToolsException();
+			ToolSpecification toolSpecification = ToolSpecification.builder()
+				.name("get_booking_details")
+				.description("Returns booking details")
+				.addParameter("bookingNumber", type("string"))
+				.build();
+			ToolExecutor toolExecutor = (t, m) -> "0";
+			return ToolProviderResult.builder()
+				.add(toolSpecification, toolExecutor)
+				.build();
 		}
-	}
-
-	public static class EmptyToolsException extends RuntimeException {
 	}
 
 	@RegisterAiService(
@@ -38,7 +54,16 @@ public class ToolProviderTest
 		chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class,
 		chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class
 	)
-	interface MyService
+	interface MyServiceWithToolProvider
+	{
+		String chat(String msg);
+	}
+
+	@RegisterAiService(
+		chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class,
+		chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class
+	)
+	interface MyServiceWithoutToolProvider
 	{
 		String chat(String msg);
 	}
@@ -46,14 +71,21 @@ public class ToolProviderTest
 	@RegisterExtension
 	static final QuarkusUnitTest unitTest = new QuarkusUnitTest()
 		.setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-			.addClasses(ToolProviderTest.MyService.class, ToolProviderTest.MyCustomToolProvider.class, BlockingChatLanguageModelSupplierTest.MyModelSupplier.class));
+			.addClasses(MyServiceWithToolProvider.class, ToolProviderTest.MyCustomToolProvider.class, BlockingChatLanguageModelSupplierTest.MyModelSupplier.class));
 
 	@Test
 	@ActivateRequestContext
 	void testCall() {
 		assertThrows(
-			EmptyToolsException.class,
-			() -> myService.chat("hello")
+			IllegalArgumentException.class,
+			() -> myServiceWithTools.chat("hello"),
+			"Tools are currently not supported by this model"
 		);
+	}
+
+	@Test
+	@ActivateRequestContext
+	void testCallNoTools() {
+		myServiceButNoTools.chat("hello");
 	}
 }

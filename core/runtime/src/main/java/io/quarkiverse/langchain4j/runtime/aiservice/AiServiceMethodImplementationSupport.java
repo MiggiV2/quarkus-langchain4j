@@ -26,6 +26,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import dev.langchain4j.service.tool.ToolProviderRequest;
+import dev.langchain4j.service.tool.ToolProviderResult;
+import io.quarkiverse.langchain4j.runtime.ToolsRecorder;
 import org.jboss.logging.Logger;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -142,6 +145,20 @@ public class AiServiceMethodImplementationSupport {
         Map<String, ToolExecutor> toolExecutors = hasMethodSpecificTools ? methodCreateInfo.getToolExecutors()
                 : context.toolExecutors;
 
+        // Here toolProvider
+        if(context.toolProvider != null){
+            toolSpecifications = new ArrayList<>();
+            toolExecutors = new HashMap<>();
+            ToolProviderRequest request = new ToolProviderRequest(memoryId, userMessage);
+            ToolProviderResult result = context.toolProvider.provideTools(request);
+            for(ToolSpecification specification : result.tools().keySet())
+            {
+                toolSpecifications.addAll(result.tools().keySet());
+                toolExecutors.put(specification.name(), result.tools().get(specification));
+                // ToDo: Use  ToolsRecorder.populateToolMetadata()
+            }
+        }
+
         Type returnType = methodCreateInfo.getReturnType();
         AugmentationResult augmentationResult = null;
         if (context.retrievalAugmentor != null) {
@@ -163,6 +180,8 @@ public class AiServiceMethodImplementationSupport {
                     }
                 }, Infrastructure.getDefaultWorkerPool());
 
+                List<ToolSpecification> finalToolSpecifications = toolSpecifications;
+                Map<String, ToolExecutor> finalToolExecutors = toolExecutors;
                 return Multi.createFrom().completionStage(augmentationResultCF).flatMap(
                         new Function<>() {
                             @Override
@@ -172,8 +191,8 @@ public class AiServiceMethodImplementationSupport {
                                         context.chatMemory(memoryId), ar);
                                 List<ChatMessage> messagesToSend = messagesToSend(augmentedUserMessage, needsMemorySeed);
                                 return Multi.createFrom()
-                                        .emitter(new MultiEmitterConsumer(messagesToSend, toolSpecifications,
-                                                toolExecutors,
+                                        .emitter(new MultiEmitterConsumer(messagesToSend, finalToolSpecifications,
+                                            finalToolExecutors,
                                                 ar.contents(),
                                                 context,
                                                 memoryId));

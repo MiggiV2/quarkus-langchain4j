@@ -320,7 +320,7 @@ public class AiServicesProcessor {
                 validateSupplierAndRegisterForReflection(moderationModelSupplierClassName, index, reflectiveClassProducer);
             }
 
-            DotName toolProviderSupplierClassName = LangChain4jDotNames.BEAN_IF_EXISTS_TOOL_PROVIDER_SUPPLIER;
+            DotName toolProviderSupplierClassName = null;
             AnnotationValue toolProviderSupplierValue = instance.value("toolProvider"); // Is this correct? or should it be toolProviderSupplier?
             if (toolProviderSupplierValue != null) {
                 toolProviderSupplierClassName = toolProviderSupplierValue.asClass().name();
