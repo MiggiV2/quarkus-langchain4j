@@ -1,6 +1,16 @@
 package io.quarkiverse.langchain4j.test;
 
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.output.FinishReason;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
+import dev.langchain4j.service.MemoryId;
+import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.service.tool.ToolProviderRequest;
@@ -17,75 +27,94 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static dev.langchain4j.agent.tool.JsonSchemaProperty.type;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.List;
+import java.util.function.Supplier;
 
-public class ToolProviderTest
-{
-	private static final Logger log = LoggerFactory.getLogger(ToolProviderTest.class);
+import static dev.langchain4j.data.message.ChatMessageType.TOOL_EXECUTION_RESULT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-	@Inject
-	MyServiceWithToolProvider myServiceWithTools;
+public class ToolProviderTest {
+    private static final Logger log = LoggerFactory.getLogger(ToolProviderTest.class);
 
-	@Inject
-	MyServiceWithoutToolProvider myServiceButNoTools;
+    @Inject
+    MyServiceWithToolProvider myServiceWithTools;
 
-	@ApplicationScoped
-	public static class MyCustomToolProvider implements ToolProvider
-	{
-		@Override
-		public ToolProviderResult provideTools(ToolProviderRequest request)
-		{
-			ToolSpecification toolSpecification = ToolSpecification.builder()
-				.name("get_booking_details")
-				.description("Returns booking details")
-				.addParameter("bookingNumber", type("string"))
-				.build();
-			ToolExecutor toolExecutor = (t, m) -> "0";
-			return ToolProviderResult.builder()
-				.add(toolSpecification, toolExecutor)
-				.build();
-		}
-	}
+    @Inject
+    MyServiceWithoutToolProvider myServiceWithoutTools;
 
-	@RegisterAiService(
-		toolProvider = MyCustomToolProvider.class,
-		chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class,
-		chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class
-	)
-	interface MyServiceWithToolProvider
-	{
-		String chat(String msg);
-	}
+    @ApplicationScoped
+    public static class MyCustomToolProvider implements ToolProvider {
+        @Override
+        public ToolProviderResult provideTools(ToolProviderRequest request) {
+            ToolSpecification toolSpecification = ToolSpecification.builder()
+                    .name("get_booking_details")
+                    .description("Returns booking details")
+                    .build();
+            ToolExecutor toolExecutor = (t, m) -> "0";
+            return ToolProviderResult.builder()
+                    .add(toolSpecification, toolExecutor)
+                    .build();
+        }
+    }
 
-	@RegisterAiService(
-		chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class,
-		chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class
-	)
-	interface MyServiceWithoutToolProvider
-	{
-		String chat(String msg);
-	}
+    public static class MiggiAiSupplier implements Supplier<ChatLanguageModel> {
+        @Override
+        public ChatLanguageModel get() {
+            return new MiggiAiModel();
+        }
+    }
 
-	@RegisterExtension
-	static final QuarkusUnitTest unitTest = new QuarkusUnitTest()
-		.setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-			.addClasses(MyServiceWithToolProvider.class, ToolProviderTest.MyCustomToolProvider.class, BlockingChatLanguageModelSupplierTest.MyModelSupplier.class));
+    public static class MiggiAiModel implements ChatLanguageModel {
+        @Override
+        public Response<AiMessage> generate(List<ChatMessage> messages) {
+            return new Response<>(new AiMessage("42"));
+        }
 
-	@Test
-	@ActivateRequestContext
-	void testCall() {
-		assertThrows(
-			IllegalArgumentException.class,
-			() -> myServiceWithTools.chat("hello"),
-			"Tools are currently not supported by this model"
-		);
-	}
+        @Override
+        public Response<AiMessage> generate(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications) {
+            ChatMessage lastMsg = messages.get(messages.size() - 1);
+            boolean isLastMsgToolResponse = lastMsg.type().equals(TOOL_EXECUTION_RESULT);
+            if (isLastMsgToolResponse) {
+                ToolExecutionResultMessage msg = (ToolExecutionResultMessage) lastMsg;
+                return new Response<>(new AiMessage(msg.text()));
+            }
+            ToolSpecification toolSpecification = toolSpecifications.get(0);
+            ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
+                    .name(toolSpecification.name())
+                    .id(toolSpecification.name())
+                    .build();
+            TokenUsage usage = new TokenUsage(42, 42);
+            return new Response<>(AiMessage.from(toolExecutionRequest), usage, FinishReason.TOOL_EXECUTION);
+        }
+    }
 
-	@Test
-	@ActivateRequestContext
-	void testCallNoTools() {
-		myServiceButNoTools.chat("hello");
-	}
+    @RegisterAiService(toolProvider = MyCustomToolProvider.class, chatLanguageModelSupplier = MiggiAiSupplier.class)
+    interface MyServiceWithToolProvider {
+        String chat(@UserMessage String msg, @MemoryId Object id);
+    }
+
+    @RegisterAiService(chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class, chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class)
+    interface MyServiceWithoutToolProvider {
+        String chat(String msg);
+    }
+
+    @RegisterExtension
+    static final QuarkusUnitTest unitTest = new QuarkusUnitTest()
+            .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
+                    .addClasses(MyServiceWithToolProvider.class, MyCustomToolProvider.class,
+                            BlockingChatLanguageModelSupplierTest.MyModelSupplier.class));
+
+    @Test
+    @ActivateRequestContext
+    void testCall() {
+        String answer = myServiceWithTools.chat("hello", 1);
+        assertEquals("0", answer);
+    }
+
+    @Test
+    @ActivateRequestContext
+    void testCallNoTools() {
+        String answer = myServiceWithoutTools.chat("hello");
+        assertEquals("42", answer);
+    }
 }

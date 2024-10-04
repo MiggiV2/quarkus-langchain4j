@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import dev.langchain4j.service.tool.ToolProvider;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.util.TypeLiteral;
 
@@ -21,6 +20,7 @@ import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.moderation.ModerationModel;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
+import dev.langchain4j.service.tool.ToolProvider;
 import io.quarkiverse.langchain4j.ModelName;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -158,11 +158,11 @@ public class AiServicesRecorder {
                         quarkusAiServices.tools(tools);
                     }
 
-                    if(info.toolProvider() != null){
+                    if (info.toolProvider() != null) {
                         // add ToolProvider here
                         ToolProvider toolProvider = (ToolProvider) Thread
-                            .currentThread().getContextClassLoader().loadClass(info.toolProvider())
-                            .getConstructor().newInstance();
+                                .currentThread().getContextClassLoader().loadClass(info.toolProvider())
+                                .getConstructor().newInstance();
                         quarkusAiServices.toolProvider(toolProvider);
                     }
                     if (info.chatMemoryProviderSupplierClassName() != null) {

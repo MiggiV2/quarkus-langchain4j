@@ -1,43 +1,8 @@
 package io.quarkiverse.langchain4j.runtime.aiservice;
 
-import static dev.langchain4j.data.message.UserMessage.userMessage;
-import static dev.langchain4j.internal.Exceptions.runtime;
-import static dev.langchain4j.service.AiServices.removeToolMessages;
-import static dev.langchain4j.service.AiServices.verifyModerationIfNeeded;
-import static io.quarkiverse.langchain4j.runtime.ResponseSchemaUtil.hasResponseSchema;
-
-import java.lang.reflect.Array;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Flow;
-import java.util.concurrent.Future;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import dev.langchain4j.service.tool.ToolProviderRequest;
-import dev.langchain4j.service.tool.ToolProviderResult;
-import io.quarkiverse.langchain4j.runtime.ToolsRecorder;
-import org.jboss.logging.Logger;
-
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.*;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
@@ -55,6 +20,8 @@ import dev.langchain4j.service.Result;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.output.ServiceOutputParser;
 import dev.langchain4j.service.tool.ToolExecutor;
+import dev.langchain4j.service.tool.ToolProviderRequest;
+import dev.langchain4j.service.tool.ToolProviderResult;
 import dev.langchain4j.spi.ServiceHelper;
 import io.quarkiverse.langchain4j.audit.Audit;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -65,6 +32,22 @@ import io.quarkiverse.langchain4j.spi.DefaultMemoryIdProvider;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.smallrye.mutiny.subscription.MultiEmitter;
+import org.jboss.logging.Logger;
+
+import java.lang.reflect.Array;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import static dev.langchain4j.data.message.UserMessage.userMessage;
+import static dev.langchain4j.internal.Exceptions.runtime;
+import static dev.langchain4j.service.AiServices.removeToolMessages;
+import static dev.langchain4j.service.AiServices.verifyModerationIfNeeded;
+import static io.quarkiverse.langchain4j.runtime.ResponseSchemaUtil.hasResponseSchema;
 
 /**
  * Provides the basic building blocks that the generated Interface methods call into
@@ -126,7 +109,7 @@ public class AiServiceMethodImplementationSupport {
     }
 
     private static Object doImplement(AiServiceMethodCreateInfo methodCreateInfo, Object[] methodArgs,
-            QuarkusAiServiceContext context, Audit audit) {
+                                      QuarkusAiServiceContext context, Audit audit) {
         Object memoryId = memoryId(methodCreateInfo, methodArgs, context.chatMemoryProvider != null);
         Optional<SystemMessage> systemMessage = prepareSystemMessage(methodCreateInfo, methodArgs,
                 context.hasChatMemory() ? context.chatMemory(memoryId).messages() : Collections.emptyList());
@@ -146,13 +129,12 @@ public class AiServiceMethodImplementationSupport {
                 : context.toolExecutors;
 
         // Here toolProvider
-        if(context.toolProvider != null){
+        if (context.toolProvider != null) {
             toolSpecifications = new ArrayList<>();
             toolExecutors = new HashMap<>();
             ToolProviderRequest request = new ToolProviderRequest(memoryId, userMessage);
             ToolProviderResult result = context.toolProvider.provideTools(request);
-            for(ToolSpecification specification : result.tools().keySet())
-            {
+            for (ToolSpecification specification : result.tools().keySet()) {
                 toolSpecifications.addAll(result.tools().keySet());
                 toolExecutors.put(specification.name(), result.tools().get(specification));
                 // ToDo: Use  ToolsRecorder.populateToolMetadata()
@@ -192,14 +174,14 @@ public class AiServiceMethodImplementationSupport {
                                 List<ChatMessage> messagesToSend = messagesToSend(augmentedUserMessage, needsMemorySeed);
                                 return Multi.createFrom()
                                         .emitter(new MultiEmitterConsumer(messagesToSend, finalToolSpecifications,
-                                            finalToolExecutors,
+                                                finalToolExecutors,
                                                 ar.contents(),
                                                 context,
                                                 memoryId));
                             }
 
                             private List<ChatMessage> messagesToSend(ChatMessage augmentedUserMessage,
-                                    boolean needsMemorySeed) {
+                                                                     boolean needsMemorySeed) {
                                 List<ChatMessage> messagesToSend;
                                 ChatMemory chatMemory;
                                 if (context.hasChatMemory()) {
@@ -343,11 +325,11 @@ public class AiServiceMethodImplementationSupport {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private static List<ChatMessage> createMessagesToSendForExistingMemory(Optional<SystemMessage> systemMessage,
-            ChatMessage userMessage,
-            ChatMemory chatMemory,
-            boolean needsMemorySeed,
-            QuarkusAiServiceContext context,
-            AiServiceMethodCreateInfo methodCreateInfo) {
+                                                                           ChatMessage userMessage,
+                                                                           ChatMemory chatMemory,
+                                                                           boolean needsMemorySeed,
+                                                                           QuarkusAiServiceContext context,
+                                                                           AiServiceMethodCreateInfo methodCreateInfo) {
         if (systemMessage.isPresent()) {
             chatMemory.add(systemMessage.get());
         }
@@ -367,10 +349,10 @@ public class AiServiceMethodImplementationSupport {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private static List<ChatMessage> createMessagesToSendForNoMemory(Optional<SystemMessage> systemMessage,
-            ChatMessage userMessage,
-            boolean needsMemorySeed,
-            QuarkusAiServiceContext context,
-            AiServiceMethodCreateInfo methodCreateInfo) {
+                                                                     ChatMessage userMessage,
+                                                                     boolean needsMemorySeed,
+                                                                     QuarkusAiServiceContext context,
+                                                                     AiServiceMethodCreateInfo methodCreateInfo) {
         List<ChatMessage> result = new ArrayList<>();
         if (systemMessage.isPresent()) {
             result.add(systemMessage.get());
@@ -413,8 +395,8 @@ public class AiServiceMethodImplementationSupport {
     }
 
     private static Future<Moderation> triggerModerationIfNeeded(AiServiceContext context,
-            AiServiceMethodCreateInfo createInfo,
-            List<ChatMessage> messages) {
+                                                                AiServiceMethodCreateInfo createInfo,
+                                                                List<ChatMessage> messages) {
         Future<Moderation> moderationFuture = null;
         if (createInfo.isRequiresModeration()) {
             log.debug("Moderation is required and it will be executed in the background");
@@ -437,7 +419,7 @@ public class AiServiceMethodImplementationSupport {
     }
 
     private static Optional<SystemMessage> prepareSystemMessage(AiServiceMethodCreateInfo createInfo, Object[] methodArgs,
-            List<ChatMessage> previousChatMessages) {
+                                                                List<ChatMessage> previousChatMessages) {
         if (createInfo.getSystemMessageInfo().isEmpty()) {
             return Optional.empty();
         }
@@ -455,7 +437,7 @@ public class AiServiceMethodImplementationSupport {
     }
 
     private static UserMessage prepareUserMessage(AiServiceContext context, AiServiceMethodCreateInfo createInfo,
-            Object[] methodArgs) {
+                                                  Object[] methodArgs) {
         AiServiceMethodCreateInfo.UserMessageInfo userMessageInfo = createInfo.getUserMessageInfo();
 
         String userName = null;
@@ -607,11 +589,11 @@ public class AiServiceMethodImplementationSupport {
         private final Object memoryId;
 
         public MultiEmitterConsumer(List<ChatMessage> messagesToSend,
-                List<ToolSpecification> toolSpecifications,
-                Map<String, ToolExecutor> toolExecutors,
-                List<dev.langchain4j.rag.content.Content> contents,
-                QuarkusAiServiceContext context,
-                Object memoryId) {
+                                    List<ToolSpecification> toolSpecifications,
+                                    Map<String, ToolExecutor> toolExecutors,
+                                    List<dev.langchain4j.rag.content.Content> contents,
+                                    QuarkusAiServiceContext context,
+                                    Object memoryId) {
             this.messagesToSend = messagesToSend;
             this.toolSpecifications = toolSpecifications;
             this.toolExecutors = toolExecutors;
@@ -636,7 +618,7 @@ public class AiServiceMethodImplementationSupport {
     }
 
     private record GuardRailsResult(boolean success, Class<? extends OutputGuardrail> bean, Exception failure,
-            boolean retry, String reprompt) {
+                                    boolean retry, String reprompt) {
 
         static GuardRailsResult SUCCESS = new GuardRailsResult(true, null, null, false, null);
 

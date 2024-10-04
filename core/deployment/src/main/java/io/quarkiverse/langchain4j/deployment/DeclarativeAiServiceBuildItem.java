@@ -118,8 +118,7 @@ public final class DeclarativeAiServiceBuildItem extends MultiBuildItem {
         return moderationModelName;
     }
 
-    public DotName getToolProviderClassDotName()
-    {
+    public DotName getToolProviderClassDotName() {
         return toolProviderClassDotName;
     }
 }
