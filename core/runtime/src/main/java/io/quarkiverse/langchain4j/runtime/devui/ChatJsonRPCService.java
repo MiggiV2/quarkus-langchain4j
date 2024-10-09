@@ -1,10 +1,6 @@
 package io.quarkiverse.langchain4j.runtime.devui;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -14,11 +10,7 @@ import jakarta.enterprise.context.control.ActivateRequestContext;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.*;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.model.StreamingResponseHandler;
@@ -30,6 +22,9 @@ import dev.langchain4j.rag.AugmentationRequest;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.rag.query.Metadata;
 import dev.langchain4j.service.tool.ToolExecutor;
+import dev.langchain4j.service.tool.ToolProvider;
+import dev.langchain4j.service.tool.ToolProviderRequest;
+import dev.langchain4j.service.tool.ToolProviderResult;
 import io.quarkiverse.langchain4j.runtime.ToolsRecorder;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatMessagePojo;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatResultPojo;
@@ -63,12 +58,16 @@ public class ChatJsonRPCService {
     private final List<ToolSpecification> toolSpecifications;
     private final Map<String, ToolExecutor> toolExecutors;
 
+    private final ToolProvider toolProvider;
+
     public ChatJsonRPCService(@All List<ChatLanguageModel> models, // don't use ChatLanguageModel model because it results in the default model not being configured
             @All List<StreamingChatLanguageModel> streamingModels,
             @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
             @All List<RetrievalAugmentor> retrievalAugmentors,
             ChatMemoryProvider memoryProvider,
-            QuarkusToolExecutorFactory toolExecutorFactory) {
+            QuarkusToolExecutorFactory toolExecutorFactory,
+            ToolProvider toolProvider) {
+        this.toolProvider = toolProvider;
         this.model = models.get(0);
         this.streamingModel = streamingModels.isEmpty() ? Optional.empty() : Optional.of(streamingModels.get(0));
         this.retrievalAugmentor = null;
@@ -215,8 +214,8 @@ public class ChatJsonRPCService {
         // removing single messages
         List<ChatMessage> chatMemoryBackup = memory.messages();
         try {
+            UserMessage userMessage = UserMessage.from(message);
             if (retrievalAugmentor != null && ragEnabled) {
-                UserMessage userMessage = UserMessage.from(message);
                 Metadata metadata = Metadata.from(userMessage, currentMemoryId.get(), memory.messages());
                 AugmentationRequest augmentationRequest = new AugmentationRequest(userMessage, metadata);
                 ChatMessage augmentedMessage = retrievalAugmentor.augment(augmentationRequest).chatMessage();
@@ -225,12 +224,22 @@ public class ChatJsonRPCService {
                 memory.add(new UserMessage(message));
             }
 
+            ToolProviderRequest toolRequest = new ToolProviderRequest(memory, userMessage);
+            ToolProviderResult toolsResult = toolProvider.provideTools(toolRequest);
+            List<ToolSpecification> toolSpecifications = new ArrayList<>(this.toolSpecifications);
+            Map<String, ToolExecutor> toolExecutors = new HashMap<>(this.toolExecutors);
+            for (ToolSpecification specification : toolsResult.tools().keySet()) {
+                toolSpecifications.add(specification);
+                toolExecutors.put(specification.name(), toolsResult.tools().get(specification));
+                // ToDo: Use  ToolsRecorder.populateToolMetadata()
+            }
             Response<AiMessage> modelResponse;
+            // Add toolProvider here, probably
             if (toolSpecifications.isEmpty()) {
                 modelResponse = model.generate(memory.messages());
                 memory.add(modelResponse.content());
             } else {
-                modelResponse = executeWithTools(memory);
+                modelResponse = executeWithTools(memory, toolSpecifications, toolExecutors);
             }
             List<ChatMessagePojo> response = ChatMessagePojo.listFromMemory(memory);
             return new ChatResultPojo(response, null);
@@ -245,7 +254,8 @@ public class ChatJsonRPCService {
 
     // FIXME: this was basically copied from `dev.langchain4j.service.DefaultAiServices`,
     // maybe it could be extracted into a reusable piece of code
-    private Response<AiMessage> executeWithTools(ChatMemory memory) {
+    private Response<AiMessage> executeWithTools(ChatMemory memory, List<ToolSpecification> toolSpecifications,
+            Map<String, ToolExecutor> toolExecutors) {
         Response<AiMessage> response = model.generate(memory.messages(), toolSpecifications);
         int MAX_SEQUENTIAL_TOOL_EXECUTIONS = 20;
         int executionsLeft = MAX_SEQUENTIAL_TOOL_EXECUTIONS;
