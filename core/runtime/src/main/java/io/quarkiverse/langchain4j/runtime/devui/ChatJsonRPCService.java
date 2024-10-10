@@ -2,7 +2,11 @@ package io.quarkiverse.langchain4j.runtime.devui;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.data.message.*;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.model.StreamingResponseHandler;
@@ -34,7 +38,11 @@ import io.smallrye.mutiny.subscription.MultiEmitter;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -60,12 +68,12 @@ public class ChatJsonRPCService {
     private final ToolProvider toolProvider;
 
     public ChatJsonRPCService(@All List<ChatLanguageModel> models, // don't use ChatLanguageModel model because it results in the default model not being configured
-                              @All List<StreamingChatLanguageModel> streamingModels,
-                              @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
-                              @All List<RetrievalAugmentor> retrievalAugmentors,
-                              ChatMemoryProvider memoryProvider,
-                              QuarkusToolExecutorFactory toolExecutorFactory,
-                              @All List<ToolProvider> toolProviders) {
+            @All List<StreamingChatLanguageModel> streamingModels,
+            @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
+            @All List<RetrievalAugmentor> retrievalAugmentors,
+            ChatMemoryProvider memoryProvider,
+            QuarkusToolExecutorFactory toolExecutorFactory,
+            @All List<ToolProvider> toolProviders) {
         this.toolProvider = toolProviders.get(toolProviders.size() - 1); // Only use the last ToolProvider
         this.model = models.get(0);
         this.streamingModel = streamingModels.isEmpty() ? Optional.empty() : Optional.of(streamingModels.get(0));
@@ -280,8 +288,8 @@ public class ChatJsonRPCService {
     }
 
     private void executeWithToolsAndStreaming(ChatMemory memory,
-                                              MultiEmitter<? super JsonObject> em,
-                                              int toolExecutionsLeft) {
+            MultiEmitter<? super JsonObject> em,
+            int toolExecutionsLeft) {
         toolExecutionsLeft--;
         if (toolExecutionsLeft == 0) {
             throw new RuntimeException(

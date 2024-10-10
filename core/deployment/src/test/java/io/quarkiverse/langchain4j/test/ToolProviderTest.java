@@ -24,8 +24,6 @@ import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -33,9 +31,7 @@ import java.util.function.Supplier;
 import static dev.langchain4j.data.message.ChatMessageType.TOOL_EXECUTION_RESULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class ToolProviderTest {
-    private static final Logger log = LoggerFactory.getLogger(ToolProviderTest.class);
-
+class ToolProviderTest {
     @Inject
     MyServiceWithToolProvider myServiceWithTools;
 

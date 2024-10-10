@@ -10,14 +10,34 @@ import io.quarkiverse.langchain4j.deployment.config.LangChain4jBuildConfig;
 import io.quarkiverse.langchain4j.deployment.items.MethodParameterAllowedAnnotationsBuildItem;
 import io.quarkiverse.langchain4j.deployment.items.SelectedChatModelProviderBuildItem;
 import io.quarkiverse.langchain4j.guardrails.OutputGuardrail;
-import io.quarkiverse.langchain4j.runtime.*;
-import io.quarkiverse.langchain4j.runtime.aiservice.*;
+import io.quarkiverse.langchain4j.runtime.AiServicesRecorder;
+import io.quarkiverse.langchain4j.runtime.NamedConfigUtil;
+import io.quarkiverse.langchain4j.runtime.QuarkusServiceOutputParser;
+import io.quarkiverse.langchain4j.runtime.RequestScopeStateDefaultMemoryIdProvider;
+import io.quarkiverse.langchain4j.runtime.ResponseSchemaUtil;
+import io.quarkiverse.langchain4j.runtime.aiservice.AiServiceClassCreateInfo;
+import io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodCreateInfo;
 import io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodCreateInfo.ResponseSchemaInfo;
+import io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodImplementationSupport;
+import io.quarkiverse.langchain4j.runtime.aiservice.ChatMemoryRemovable;
+import io.quarkiverse.langchain4j.runtime.aiservice.ChatMemorySeeder;
+import io.quarkiverse.langchain4j.runtime.aiservice.DeclarativeAiServiceCreateInfo;
+import io.quarkiverse.langchain4j.runtime.aiservice.MetricsCountedWrapper;
+import io.quarkiverse.langchain4j.runtime.aiservice.MetricsTimedWrapper;
+import io.quarkiverse.langchain4j.runtime.aiservice.QuarkusAiServiceContext;
+import io.quarkiverse.langchain4j.runtime.aiservice.SpanWrapper;
 import io.quarkiverse.langchain4j.spi.DefaultMemoryIdProvider;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ArcContainer;
 import io.quarkus.arc.InstanceHandle;
-import io.quarkus.arc.deployment.*;
+import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
+import io.quarkus.arc.deployment.CustomScopeAnnotationsBuildItem;
+import io.quarkus.arc.deployment.GeneratedBeanBuildItem;
+import io.quarkus.arc.deployment.GeneratedBeanGizmoAdaptor;
+import io.quarkus.arc.deployment.SynthesisFinishedBuildItem;
+import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
+import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
+import io.quarkus.arc.deployment.ValidationPhaseBuildItem;
 import io.quarkus.arc.processor.BuiltinScope;
 import io.quarkus.builder.item.MultiBuildItem;
 import io.quarkus.deployment.Capabilities;
@@ -33,15 +53,30 @@ import io.quarkus.deployment.builditem.HotDeploymentWatchedFileBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.ReflectiveClassBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.ServiceProviderBuildItem;
 import io.quarkus.deployment.metrics.MetricsCapabilityBuildItem;
-import io.quarkus.gizmo.*;
+import io.quarkus.gizmo.ClassCreator;
+import io.quarkus.gizmo.ClassOutput;
+import io.quarkus.gizmo.FieldDescriptor;
+import io.quarkus.gizmo.Gizmo;
+import io.quarkus.gizmo.MethodCreator;
+import io.quarkus.gizmo.MethodDescriptor;
+import io.quarkus.gizmo.ResultHandle;
 import io.quarkus.runtime.metrics.MetricsFactory;
 import io.smallrye.mutiny.Multi;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.spi.DeploymentException;
 import jakarta.inject.Inject;
+import org.jboss.jandex.AnnotationInstance;
+import org.jboss.jandex.AnnotationTarget;
+import org.jboss.jandex.AnnotationValue;
+import org.jboss.jandex.ClassInfo;
+import org.jboss.jandex.ClassType;
+import org.jboss.jandex.DotName;
+import org.jboss.jandex.IndexView;
+import org.jboss.jandex.MethodInfo;
+import org.jboss.jandex.MethodParameterInfo;
+import org.jboss.jandex.ParameterizedType;
 import org.jboss.jandex.Type;
-import org.jboss.jandex.*;
 import org.jboss.logging.Logger;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
@@ -53,7 +88,18 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -61,8 +107,17 @@ import java.util.stream.Collectors;
 
 import static dev.langchain4j.exception.IllegalConfigurationException.illegalConfiguration;
 import static io.quarkiverse.langchain4j.deployment.ExceptionUtil.illegalConfigurationForMethod;
-import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.*;
-import static io.quarkiverse.langchain4j.deployment.MethodParameterAsTemplateVariableAllowance.*;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.BEAN_IF_EXISTS_RETRIEVAL_AUGMENTOR_SUPPLIER;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.INPUT_GUARDRAILS;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.MEMORY_ID;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.NO_RETRIEVAL_AUGMENTOR_SUPPLIER;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.NO_RETRIEVER;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.OUTPUT_GUARDRAILS;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.SEED_MEMORY;
+import static io.quarkiverse.langchain4j.deployment.LangChain4jDotNames.V;
+import static io.quarkiverse.langchain4j.deployment.MethodParameterAsTemplateVariableAllowance.FORCE_ALLOW;
+import static io.quarkiverse.langchain4j.deployment.MethodParameterAsTemplateVariableAllowance.IGNORE;
+import static io.quarkiverse.langchain4j.deployment.MethodParameterAsTemplateVariableAllowance.OPTIONAL_DENY;
 
 @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public class AiServicesProcessor {
@@ -104,9 +159,9 @@ public class AiServicesProcessor {
 
     @BuildStep
     public void nativeSupport(CombinedIndexBuildItem indexBuildItem,
-                              List<AiServicesMethodBuildItem> aiServicesMethodBuildItems,
-                              BuildProducer<ReflectiveClassBuildItem> reflectiveClassProducer,
-                              BuildProducer<ServiceProviderBuildItem> serviceProviderProducer) {
+            List<AiServicesMethodBuildItem> aiServicesMethodBuildItems,
+            BuildProducer<ReflectiveClassBuildItem> reflectiveClassProducer,
+            BuildProducer<ServiceProviderBuildItem> serviceProviderProducer) {
         IndexView index = indexBuildItem.getIndex();
         Collection<AnnotationInstance> instances = index.getAnnotations(LangChain4jDotNames.DESCRIPTION);
         Set<ClassInfo> classesUsingDescription = new HashSet<>();
@@ -146,12 +201,12 @@ public class AiServicesProcessor {
 
     @BuildStep
     public void findDeclarativeServices(CombinedIndexBuildItem indexBuildItem,
-                                        CustomScopeAnnotationsBuildItem customScopes,
-                                        BuildProducer<RequestChatModelBeanBuildItem> requestChatModelBeanProducer,
-                                        BuildProducer<RequestModerationModelBeanBuildItem> requestModerationModelBeanProducer,
-                                        BuildProducer<DeclarativeAiServiceBuildItem> declarativeAiServiceProducer,
-                                        BuildProducer<ReflectiveClassBuildItem> reflectiveClassProducer,
-                                        BuildProducer<GeneratedClassBuildItem> generatedClassProducer) {
+            CustomScopeAnnotationsBuildItem customScopes,
+            BuildProducer<RequestChatModelBeanBuildItem> requestChatModelBeanProducer,
+            BuildProducer<RequestModerationModelBeanBuildItem> requestModerationModelBeanProducer,
+            BuildProducer<DeclarativeAiServiceBuildItem> declarativeAiServiceProducer,
+            BuildProducer<ReflectiveClassBuildItem> reflectiveClassProducer,
+            BuildProducer<GeneratedClassBuildItem> generatedClassProducer) {
         IndexView index = indexBuildItem.getIndex();
 
         Set<String> chatModelNames = new HashSet<>();
@@ -342,7 +397,7 @@ public class AiServicesProcessor {
     }
 
     private void validateSupplierAndRegisterForReflection(DotName supplierDotName, IndexView index,
-                                                          BuildProducer<ReflectiveClassBuildItem> producer) {
+            BuildProducer<ReflectiveClassBuildItem> producer) {
         ClassInfo classInfo = index.getClassByName(supplierDotName);
         if (classInfo == null) {
             log.warn("'" + supplierDotName.toString() + "' cannot be indexed"); // TODO: maybe this should be an error
@@ -360,10 +415,10 @@ public class AiServicesProcessor {
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
     public void handleDeclarativeServices(AiServicesRecorder recorder,
-                                          List<DeclarativeAiServiceBuildItem> declarativeAiServiceItems,
-                                          List<SelectedChatModelProviderBuildItem> selectedChatModelProvider,
-                                          BuildProducer<SyntheticBeanBuildItem> syntheticBeanProducer,
-                                          BuildProducer<UnremovableBeanBuildItem> unremoveableProducer) {
+            List<DeclarativeAiServiceBuildItem> declarativeAiServiceItems,
+            List<SelectedChatModelProviderBuildItem> selectedChatModelProvider,
+            BuildProducer<SyntheticBeanBuildItem> syntheticBeanProducer,
+            BuildProducer<UnremovableBeanBuildItem> unremoveableProducer) {
 
         boolean needsChatModelBean = false;
         boolean needsStreamingChatModelBean = false;
@@ -519,7 +574,7 @@ public class AiServicesProcessor {
                 // Use a CDI bean of type `RetrievalAugmentor` if one exists, otherwise
                 // don't use an augmentor.
                 configurator.addInjectionPoint(ParameterizedType.create(DotNames.CDI_INSTANCE,
-                        new Type[]{ClassType.create(LangChain4jDotNames.RETRIEVAL_AUGMENTOR)}, null));
+                        new Type[] { ClassType.create(LangChain4jDotNames.RETRIEVAL_AUGMENTOR) }, null));
                 needsRetrievalAugmentorBean = true;
             } else {
                 if (retrievalAugmentorSupplierClassName != null) {
@@ -538,7 +593,7 @@ public class AiServicesProcessor {
 
             if (LangChain4jDotNames.BEAN_IF_EXISTS_AUDIT_SERVICE_SUPPLIER.toString().equals(auditServiceClassSupplierName)) {
                 configurator.addInjectionPoint(ParameterizedType.create(DotNames.CDI_INSTANCE,
-                        new Type[]{ClassType.create(LangChain4jDotNames.AUDIT_SERVICE)}, null));
+                        new Type[] { ClassType.create(LangChain4jDotNames.AUDIT_SERVICE) }, null));
                 needsAuditServiceBean = true;
             }
 
@@ -561,7 +616,7 @@ public class AiServicesProcessor {
 
             configurator
                     .addInjectionPoint(ParameterizedType.create(DotNames.CDI_INSTANCE,
-                            new Type[]{ClassType.create(OutputGuardrail.class)}, null))
+                            new Type[] { ClassType.create(OutputGuardrail.class) }, null))
                     .done();
 
             syntheticBeanProducer.produce(configurator.done());
@@ -598,7 +653,7 @@ public class AiServicesProcessor {
 
     @BuildStep
     public void markUsedOutputGuardRailsUnremovable(List<AiServicesMethodBuildItem> methods,
-                                                    BuildProducer<UnremovableBeanBuildItem> unremovableProducer) {
+            BuildProducer<UnremovableBeanBuildItem> unremovableProducer) {
         for (AiServicesMethodBuildItem method : methods) {
             List<String> list = new ArrayList<>(method.getOutputGuardrails());
             list.addAll(method.getInputGuardrails());
@@ -610,8 +665,8 @@ public class AiServicesProcessor {
 
     @BuildStep
     public void detectMissingGuardRails(SynthesisFinishedBuildItem synthesisFinished,
-                                        List<AiServicesMethodBuildItem> methods,
-                                        BuildProducer<ValidationPhaseBuildItem.ValidationErrorBuildItem> errors) {
+            List<AiServicesMethodBuildItem> methods,
+            BuildProducer<ValidationPhaseBuildItem.ValidationErrorBuildItem> errors) {
 
         for (AiServicesMethodBuildItem method : methods) {
             List<String> list = new ArrayList<>(method.getOutputGuardrails());
@@ -627,7 +682,7 @@ public class AiServicesProcessor {
 
     @BuildStep
     public void watchResourceFiles(CombinedIndexBuildItem indexBuildItem,
-                                   BuildProducer<HotDeploymentWatchedFileBuildItem> producer) {
+            BuildProducer<HotDeploymentWatchedFileBuildItem> producer) {
         IndexView index = indexBuildItem.getIndex();
         List<AnnotationInstance> instances = new ArrayList<>();
         instances.addAll(index.getAnnotations(LangChain4jDotNames.SYSTEM_MESSAGE));
@@ -840,7 +895,7 @@ public class AiServicesProcessor {
                                 if (annotationInstance.name().toString()
                                         .startsWith("org.eclipse.microprofile.faulttolerance")
                                         || annotationInstance.name().toString()
-                                        .startsWith("io.smallrye.faulttolerance.api")) {
+                                                .startsWith("io.smallrye.faulttolerance.api")) {
                                     mc.addAnnotation(annotationInstance);
                                 }
                             }
@@ -1035,7 +1090,7 @@ public class AiServicesProcessor {
     }
 
     private List<TemplateParameterInfo> gatherTemplateParamInfo(List<MethodParameterInfo> params,
-                                                                Collection<Predicate<AnnotationInstance>> allowedPredicates) {
+            Collection<Predicate<AnnotationInstance>> allowedPredicates) {
         if (params.isEmpty()) {
             return Collections.emptyList();
         }
@@ -1099,7 +1154,7 @@ public class AiServicesProcessor {
     }
 
     private Optional<AiServiceMethodCreateInfo.TemplateInfo> gatherSystemMessageInfo(MethodInfo method,
-                                                                                     List<TemplateParameterInfo> templateParams) {
+            List<TemplateParameterInfo> templateParams) {
         AnnotationInstance instance = method.annotation(LangChain4jDotNames.SYSTEM_MESSAGE);
         if (instance == null) { // try and see if the class is annotated with @SystemMessage
             instance = method.declaringClass().declaredAnnotation(LangChain4jDotNames.SYSTEM_MESSAGE);
@@ -1126,7 +1181,7 @@ public class AiServicesProcessor {
     }
 
     private AiServiceMethodCreateInfo.UserMessageInfo gatherUserMessageInfo(MethodInfo method,
-                                                                            List<TemplateParameterInfo> templateParams) {
+            List<TemplateParameterInfo> templateParams) {
 
         Optional<Integer> userNameParamName = method.annotations(LangChain4jDotNames.USER_NAME).stream().filter(
                 IS_METHOD_PARAMETER_ANNOTATION).map(METHOD_PARAMETER_POSITION_FUNCTION).findFirst();
@@ -1183,7 +1238,7 @@ public class AiServicesProcessor {
     }
 
     private Optional<AiServiceMethodCreateInfo.MetricsTimedInfo> gatherMetricsTimedInfo(MethodInfo method,
-                                                                                        boolean addMicrometerMetrics) {
+            boolean addMicrometerMetrics) {
         if (!addMicrometerMetrics) {
             return Optional.empty();
         }
@@ -1242,7 +1297,7 @@ public class AiServicesProcessor {
     }
 
     private Optional<AiServiceMethodCreateInfo.MetricsCountedInfo> gatherMetricsCountedInfo(MethodInfo method,
-                                                                                            boolean addMicrometerMetrics) {
+            boolean addMicrometerMetrics) {
         if (!addMicrometerMetrics) {
             return Optional.empty();
         }
@@ -1300,7 +1355,7 @@ public class AiServicesProcessor {
     }
 
     private Optional<AiServiceMethodCreateInfo.SpanInfo> gatherSpanInfo(MethodInfo method,
-                                                                        boolean addOpenTelemetrySpans) {
+            boolean addOpenTelemetrySpans) {
         if (!addOpenTelemetrySpans) {
             return Optional.empty();
         }
@@ -1365,7 +1420,7 @@ public class AiServicesProcessor {
      * </pre>
      */
     private String generateAiServiceChatMemorySeeder(ClassInfo iface, MethodInfo seedMemoryTargetMethod,
-                                                     ClassOutput classOutput) {
+            ClassOutput classOutput) {
         if (!Modifier.isStatic(seedMemoryTargetMethod.flags())) {
             throw new IllegalConfigurationException(
                     "The @SeedMemory annotation can only be placed on static methods. Offending method is '"
