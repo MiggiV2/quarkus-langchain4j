@@ -1,13 +1,5 @@
 package io.quarkiverse.langchain4j.runtime.devui;
 
-import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
-
-import jakarta.enterprise.context.control.ActivateRequestContext;
-
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.*;
@@ -40,6 +32,13 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.smallrye.mutiny.subscription.MultiEmitter;
 import io.vertx.core.json.JsonObject;
+import jakarta.enterprise.context.control.ActivateRequestContext;
+
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 @ActivateRequestContext
 public class ChatJsonRPCService {
@@ -61,13 +60,13 @@ public class ChatJsonRPCService {
     private final ToolProvider toolProvider;
 
     public ChatJsonRPCService(@All List<ChatLanguageModel> models, // don't use ChatLanguageModel model because it results in the default model not being configured
-            @All List<StreamingChatLanguageModel> streamingModels,
-            @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
-            @All List<RetrievalAugmentor> retrievalAugmentors,
-            ChatMemoryProvider memoryProvider,
-            QuarkusToolExecutorFactory toolExecutorFactory,
-            ToolProvider toolProvider) {
-        this.toolProvider = toolProvider;
+                              @All List<StreamingChatLanguageModel> streamingModels,
+                              @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
+                              @All List<RetrievalAugmentor> retrievalAugmentors,
+                              ChatMemoryProvider memoryProvider,
+                              QuarkusToolExecutorFactory toolExecutorFactory,
+                              @All List<ToolProvider> toolProviders) {
+        this.toolProvider = toolProviders.get(toolProviders.size() - 1); // Only use the last ToolProvider
         this.model = models.get(0);
         this.streamingModel = streamingModels.isEmpty() ? Optional.empty() : Optional.of(streamingModels.get(0));
         this.retrievalAugmentor = null;
@@ -226,20 +225,19 @@ public class ChatJsonRPCService {
 
             ToolProviderRequest toolRequest = new ToolProviderRequest(memory, userMessage);
             ToolProviderResult toolsResult = toolProvider.provideTools(toolRequest);
-            List<ToolSpecification> toolSpecifications = new ArrayList<>(this.toolSpecifications);
-            Map<String, ToolExecutor> toolExecutors = new HashMap<>(this.toolExecutors);
             for (ToolSpecification specification : toolsResult.tools().keySet()) {
                 toolSpecifications.add(specification);
                 toolExecutors.put(specification.name(), toolsResult.tools().get(specification));
                 // ToDo: Use  ToolsRecorder.populateToolMetadata()
             }
             Response<AiMessage> modelResponse;
-            // Add toolProvider here, probably
             if (toolSpecifications.isEmpty()) {
                 modelResponse = model.generate(memory.messages());
                 memory.add(modelResponse.content());
             } else {
-                modelResponse = executeWithTools(memory, toolSpecifications, toolExecutors);
+                executeWithTools(memory);
+                toolSpecifications.clear();
+                toolExecutors.clear();
             }
             List<ChatMessagePojo> response = ChatMessagePojo.listFromMemory(memory);
             return new ChatResultPojo(response, null);
@@ -254,8 +252,7 @@ public class ChatJsonRPCService {
 
     // FIXME: this was basically copied from `dev.langchain4j.service.DefaultAiServices`,
     // maybe it could be extracted into a reusable piece of code
-    private Response<AiMessage> executeWithTools(ChatMemory memory, List<ToolSpecification> toolSpecifications,
-            Map<String, ToolExecutor> toolExecutors) {
+    private Response<AiMessage> executeWithTools(ChatMemory memory) {
         Response<AiMessage> response = model.generate(memory.messages(), toolSpecifications);
         int MAX_SEQUENTIAL_TOOL_EXECUTIONS = 20;
         int executionsLeft = MAX_SEQUENTIAL_TOOL_EXECUTIONS;
@@ -283,8 +280,8 @@ public class ChatJsonRPCService {
     }
 
     private void executeWithToolsAndStreaming(ChatMemory memory,
-            MultiEmitter<? super JsonObject> em,
-            int toolExecutionsLeft) {
+                                              MultiEmitter<? super JsonObject> em,
+                                              int toolExecutionsLeft) {
         toolExecutionsLeft--;
         if (toolExecutionsLeft == 0) {
             throw new RuntimeException(
