@@ -389,6 +389,7 @@ public class AiServicesProcessor {
                             cdiScope,
                             chatModelName,
                             moderationModelName,
+                            imageModelName,
                             toolProviderSupplierClassName));
         }
 
@@ -819,7 +820,7 @@ public class AiServicesProcessor {
         for (ClassInfo classInfo : index.getKnownUsers(LangChain4jDotNames.AI_SERVICES)) {
             String className = classInfo.name().toString();
             if (className.startsWith("io.quarkiverse.langchain4j") || className.startsWith("dev.langchain4j")) { // TODO: this can be made smarter if
-                                                                                                                 // needed
+                // needed
                 continue;
             }
             try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(
