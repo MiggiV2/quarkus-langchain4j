@@ -33,6 +33,7 @@ import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.service.tool.ToolProviderRequest;
 import dev.langchain4j.service.tool.ToolProviderResult;
+import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.runtime.ToolsRecorder;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatMessagePojo;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatResultPojo;
@@ -75,7 +76,7 @@ public class ChatJsonRPCService {
             ChatMemoryProvider memoryProvider,
             QuarkusToolExecutorFactory toolExecutorFactory,
             @All List<ToolProvider> toolProviders) {
-        this.toolProvider = toolProviders.get(toolProviders.size() - 1); // Only use the last ToolProvider
+        this.toolProvider = getToolProvider(toolProviders);
         this.model = models.get(0);
         this.streamingModel = streamingModels.isEmpty() ? Optional.empty() : Optional.of(streamingModels.get(0));
         this.retrievalAugmentor = null;
@@ -123,6 +124,7 @@ public class ChatJsonRPCService {
     }
 
     private final AtomicReference<ChatMemory> currentMemory = new AtomicReference<>();
+
     private final AtomicLong currentMemoryId = new AtomicLong();
 
     public String reset(String systemMessage) {
@@ -265,6 +267,7 @@ public class ChatJsonRPCService {
 
     // FIXME: this was basically copied from `dev.langchain4j.service.DefaultAiServices`,
     // maybe it could be extracted into a reusable piece of code
+
     private Response<AiMessage> executeWithTools(ChatMemory memory) {
         Response<AiMessage> response = model.generate(memory.messages(), toolSpecifications);
         int MAX_SEQUENTIAL_TOOL_EXECUTIONS = 20;
@@ -343,4 +346,13 @@ public class ChatJsonRPCService {
         });
     }
 
+    private ToolProvider getToolProvider(List<ToolProvider> toolProviders) {
+        for (ToolProvider currentProvider : toolProviders) {
+            boolean isDefault = currentProvider instanceof RegisterAiService.BeanIfExistsToolProviderSupplier;
+            if (!isDefault) {
+                return currentProvider;
+            }
+        }
+        return toolProviders.get(0);
+    }
 }
