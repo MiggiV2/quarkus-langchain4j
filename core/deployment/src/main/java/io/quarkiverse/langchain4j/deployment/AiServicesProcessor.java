@@ -610,7 +610,9 @@ public class AiServicesProcessor {
             }
 
             if (toolProviderSupplierClassName != null) {
-                allToolProviders.add(DotName.createSimple(toolProviderSupplierClassName));
+                DotName toolProvider = DotName.createSimple(toolProviderSupplierClassName);
+                configurator.addInjectionPoint(ClassType.create(toolProvider));
+                allToolProviders.add(toolProvider);
             }
 
             configurator

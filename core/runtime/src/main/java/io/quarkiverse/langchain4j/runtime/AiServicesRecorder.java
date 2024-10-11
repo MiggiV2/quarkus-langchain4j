@@ -158,9 +158,9 @@ public class AiServicesRecorder {
                     }
 
                     if (info.toolProvider() != null) {
-                        ToolProvider toolProvider = (ToolProvider) Thread
-                                .currentThread().getContextClassLoader().loadClass(info.toolProvider())
-                                .getConstructor().newInstance();
+                        Class<?> toolProviderClaz = Thread.currentThread().getContextClassLoader()
+                                .loadClass(info.toolProvider());
+                        ToolProvider toolProvider = (ToolProvider) creationalContext.getInjectedReference(toolProviderClaz);
                         quarkusAiServices.toolProvider(toolProvider);
                     }
                     if (info.chatMemoryProviderSupplierClassName() != null) {

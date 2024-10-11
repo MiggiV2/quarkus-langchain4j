@@ -40,8 +40,13 @@ class ToolProviderTest {
 
     @ApplicationScoped
     public static class MyCustomToolProvider implements ToolProvider {
+        @Inject
+        MyServiceWithoutToolProvider myServiceWithoutTools;
+
         @Override
         public ToolProviderResult provideTools(ToolProviderRequest request) {
+            String simpleAnswer = myServiceWithoutTools.chat("Hi");
+            assertEquals("42", simpleAnswer);
             ToolSpecification toolSpecification = ToolSpecification.builder()
                     .name("get_booking_details")
                     .description("Returns booking details")
