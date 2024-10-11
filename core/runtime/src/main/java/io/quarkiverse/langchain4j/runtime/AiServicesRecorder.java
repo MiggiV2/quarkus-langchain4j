@@ -1,18 +1,5 @@
 package io.quarkiverse.langchain4j.runtime;
 
-import static io.quarkiverse.langchain4j.QuarkusAiServicesFactory.InstanceHolder.INSTANCE;
-
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import jakarta.enterprise.inject.Instance;
-import jakarta.enterprise.util.TypeLiteral;
-
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -32,6 +19,18 @@ import io.quarkiverse.langchain4j.runtime.aiservice.QuarkusAiServiceContext;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.SyntheticCreationalContext;
 import io.quarkus.runtime.annotations.Recorder;
+import jakarta.enterprise.inject.Instance;
+import jakarta.enterprise.util.TypeLiteral;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import static io.quarkiverse.langchain4j.QuarkusAiServicesFactory.InstanceHolder.INSTANCE;
 
 @Recorder
 public class AiServicesRecorder {
@@ -159,7 +158,6 @@ public class AiServicesRecorder {
                     }
 
                     if (info.toolProvider() != null) {
-                        // add ToolProvider here
                         ToolProvider toolProvider = (ToolProvider) Thread
                                 .currentThread().getContextClassLoader().loadClass(info.toolProvider())
                                 .getConstructor().newInstance();

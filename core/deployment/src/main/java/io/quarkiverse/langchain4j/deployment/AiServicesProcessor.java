@@ -320,7 +320,7 @@ public class AiServicesProcessor {
             }
 
             DotName toolProviderSupplierClassName = null;
-            AnnotationValue toolProviderSupplierValue = instance.value("toolProvider"); // Is this correct? or should it be toolProviderSupplier?
+            AnnotationValue toolProviderSupplierValue = instance.value("toolProvider");
             if (toolProviderSupplierValue != null) {
                 toolProviderSupplierClassName = toolProviderSupplierValue.asClass().name();
                 validateSupplierAndRegisterForReflection(toolProviderSupplierClassName, index, reflectiveClassProducer);
@@ -366,7 +366,6 @@ public class AiServicesProcessor {
                             cdiScope,
                             chatModelName,
                             moderationModelName,
-                            // ToDo: Add toolProvider here
                             toolProviderSupplierClassName));
         }
 

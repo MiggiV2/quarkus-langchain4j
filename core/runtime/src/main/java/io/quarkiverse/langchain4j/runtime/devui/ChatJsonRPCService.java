@@ -1,5 +1,17 @@
 package io.quarkiverse.langchain4j.runtime.devui;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+
+import jakarta.enterprise.context.control.ActivateRequestContext;
+
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -36,17 +48,6 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.smallrye.mutiny.subscription.MultiEmitter;
 import io.vertx.core.json.JsonObject;
-import jakarta.enterprise.context.control.ActivateRequestContext;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 
 @ActivateRequestContext
 public class ChatJsonRPCService {
@@ -233,6 +234,7 @@ public class ChatJsonRPCService {
 
             ToolProviderRequest toolRequest = new ToolProviderRequest(memory, userMessage);
             ToolProviderResult toolsResult = toolProvider.provideTools(toolRequest);
+            // The default toolProvider will return only an empty list
             for (ToolSpecification specification : toolsResult.tools().keySet()) {
                 toolSpecifications.add(specification);
                 toolExecutors.put(specification.name(), toolsResult.tools().get(specification));
@@ -244,6 +246,9 @@ public class ChatJsonRPCService {
                 memory.add(modelResponse.content());
             } else {
                 executeWithTools(memory);
+            }
+            // Remove toolProvider tools again
+            if (!toolsResult.tools().isEmpty()) {
                 toolSpecifications.clear();
                 toolExecutors.clear();
             }

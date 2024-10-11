@@ -1,5 +1,33 @@
 package io.quarkiverse.langchain4j.runtime.aiservice;
 
+import static dev.langchain4j.data.message.UserMessage.userMessage;
+import static dev.langchain4j.internal.Exceptions.runtime;
+import static dev.langchain4j.service.AiServices.removeToolMessages;
+import static dev.langchain4j.service.AiServices.verifyModerationIfNeeded;
+import static io.quarkiverse.langchain4j.runtime.ResponseSchemaUtil.hasResponseSchema;
+
+import java.lang.reflect.Array;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Flow;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import org.jboss.logging.Logger;
+
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -36,33 +64,6 @@ import io.quarkiverse.langchain4j.spi.DefaultMemoryIdProvider;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.smallrye.mutiny.subscription.MultiEmitter;
-import org.jboss.logging.Logger;
-
-import java.lang.reflect.Array;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Flow;
-import java.util.concurrent.Future;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import static dev.langchain4j.data.message.UserMessage.userMessage;
-import static dev.langchain4j.internal.Exceptions.runtime;
-import static dev.langchain4j.service.AiServices.removeToolMessages;
-import static dev.langchain4j.service.AiServices.verifyModerationIfNeeded;
-import static io.quarkiverse.langchain4j.runtime.ResponseSchemaUtil.hasResponseSchema;
 
 /**
  * Provides the basic building blocks that the generated Interface methods call into
@@ -143,7 +144,6 @@ public class AiServiceMethodImplementationSupport {
         Map<String, ToolExecutor> toolExecutors = hasMethodSpecificTools ? methodCreateInfo.getToolExecutors()
                 : context.toolExecutors;
 
-        // Here toolProvider
         if (context.toolProvider != null) {
             toolSpecifications = new ArrayList<>();
             toolExecutors = new HashMap<>();
@@ -155,6 +155,8 @@ public class AiServiceMethodImplementationSupport {
                 // ToDo: Use  ToolsRecorder.populateToolMetadata()
             }
         }
+        List<ToolSpecification> finalToolSpecifications = toolSpecifications;
+        Map<String, ToolExecutor> finalToolExecutors = toolExecutors;
 
         Type returnType = methodCreateInfo.getReturnType();
         AugmentationResult augmentationResult = null;
@@ -177,8 +179,6 @@ public class AiServiceMethodImplementationSupport {
                     }
                 }, Infrastructure.getDefaultWorkerPool());
 
-                List<ToolSpecification> finalToolSpecifications = toolSpecifications;
-                Map<String, ToolExecutor> finalToolExecutors = toolExecutors;
                 return Multi.createFrom().completionStage(augmentationResultCF).flatMap(
                         new Function<>() {
                             @Override
