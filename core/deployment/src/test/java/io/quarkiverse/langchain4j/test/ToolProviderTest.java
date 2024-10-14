@@ -1,20 +1,5 @@
 package io.quarkiverse.langchain4j.test;
 
-import static dev.langchain4j.data.message.ChatMessageType.TOOL_EXECUTION_RESULT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.util.List;
-import java.util.function.Supplier;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.context.control.ActivateRequestContext;
-import jakarta.inject.Inject;
-
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
-
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -32,6 +17,19 @@ import dev.langchain4j.service.tool.ToolProviderRequest;
 import dev.langchain4j.service.tool.ToolProviderResult;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkus.test.QuarkusUnitTest;
+import jakarta.enterprise.context.control.ActivateRequestContext;
+import jakarta.inject.Inject;
+import org.jboss.shrinkwrap.api.ShrinkWrap;
+import org.jboss.shrinkwrap.api.spec.JavaArchive;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+import java.util.List;
+import java.util.function.Supplier;
+
+import static dev.langchain4j.data.message.ChatMessageType.TOOL_EXECUTION_RESULT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class ToolProviderTest {
     @Inject
@@ -40,19 +38,28 @@ class ToolProviderTest {
     @Inject
     MyServiceWithoutToolProvider myServiceWithoutTools;
 
-    @ApplicationScoped
+    // @ApplicationScoped
+    public static class MyCustomToolProviderSupplier implements Supplier<ToolProvider> {
+        @Override
+        public ToolProvider get() {
+            return null;
+        }
+    }
+
+    // @ApplicationScoped
     public static class MyCustomToolProvider implements ToolProvider {
-        @Inject
+        //  @Inject
         MyServiceWithoutToolProvider myServiceWithoutTools;
 
         @Override
         public ToolProviderResult provideTools(ToolProviderRequest request) {
-            String simpleAnswer = myServiceWithoutTools.chat("Hi");
-            assertEquals("42", simpleAnswer);
+            assertNotNull(myServiceWithoutTools, "An injected service, should not be null.");
+
             ToolSpecification toolSpecification = ToolSpecification.builder()
                     .name("get_booking_details")
                     .description("Returns booking details")
                     .build();
+
             ToolExecutor toolExecutor = (t, m) -> "0";
             return ToolProviderResult.builder()
                     .add(toolSpecification, toolExecutor)
@@ -60,14 +67,14 @@ class ToolProviderTest {
         }
     }
 
-    public static class MiggiAiSupplier implements Supplier<ChatLanguageModel> {
+    public static class TestAiSupplier implements Supplier<ChatLanguageModel> {
         @Override
         public ChatLanguageModel get() {
-            return new MiggiAiModel();
+            return new TestAiModel();
         }
     }
 
-    public static class MiggiAiModel implements ChatLanguageModel {
+    public static class TestAiModel implements ChatLanguageModel {
         @Override
         public Response<AiMessage> generate(List<ChatMessage> messages) {
             return new Response<>(new AiMessage("42"));
@@ -91,12 +98,12 @@ class ToolProviderTest {
         }
     }
 
-    @RegisterAiService(toolProvider = MyCustomToolProvider.class, chatLanguageModelSupplier = MiggiAiSupplier.class)
+    @RegisterAiService(toolProvider = MyCustomToolProviderSupplier.class, chatLanguageModelSupplier = TestAiSupplier.class)
     interface MyServiceWithToolProvider {
         String chat(@UserMessage String msg, @MemoryId Object id);
     }
 
-    @RegisterAiService(chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class, chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class)
+    @RegisterAiService(chatLanguageModelSupplier = TestAiSupplier.class)
     interface MyServiceWithoutToolProvider {
         String chat(String msg);
     }

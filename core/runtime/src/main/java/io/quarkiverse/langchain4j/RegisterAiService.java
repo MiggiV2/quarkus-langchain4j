@@ -1,16 +1,5 @@
 package io.quarkiverse.langchain4j;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.util.HashMap;
-import java.util.List;
-import java.util.function.Supplier;
-
-import jakarta.enterprise.context.ApplicationScoped;
-
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
@@ -23,11 +12,17 @@ import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.ToolProvider;
-import dev.langchain4j.service.tool.ToolProviderRequest;
-import dev.langchain4j.service.tool.ToolProviderResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.quarkiverse.langchain4j.audit.AuditService;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.List;
+import java.util.function.Supplier;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Used to create LangChain4j's {@link AiServices} in a declarative manner that the application can then use simply by
@@ -74,7 +69,7 @@ public @interface RegisterAiService {
      * If not set, the default model (i.e. the one configured without setting the model name) is used.
      * An example of the default model configuration is the following:
      * {@code quarkus.langchain4j.openai.chat-model.model-name=gpt-4-turbo-preview}
-     *
+     * <p>
      * If set, it uses the model configured by name. For example if this is set to {@code somename}
      * an example configuration value for that named model could be:
      * {@code quarkus.langchain4j.somename.openai.chat-model.model-name=gpt-4-turbo-preview}
@@ -122,7 +117,7 @@ public @interface RegisterAiService {
      * typically it will, so consider adding a bean-defining annotation to
      * it). If it is not a CDI bean, Quarkus will create an instance
      * by calling its no-arg constructor.
-     *
+     * <p>
      * If unspecified, Quarkus will attempt to locate a CDI bean that
      * implements {@link RetrievalAugmentor} and use it if one exists.
      */
@@ -146,7 +141,10 @@ public @interface RegisterAiService {
      */
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
-    Class<? extends ToolProvider> toolProvider() default BeanIfExistsToolProviderSupplier.class;
+    /**
+     * Configures a toolProvider. Either a toolProvider or "normal" tools can be used, but not both
+     */
+    Class<? extends Supplier<ToolProvider>> toolProvider() default BeanIfExistsToolProviderSupplier.class;
 
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
@@ -271,13 +269,14 @@ public @interface RegisterAiService {
         }
     }
 
-    @ApplicationScoped
-    final class BeanIfExistsToolProviderSupplier implements ToolProvider {
+    /**
+     * Marker that is used when the user does not want any toolProvider for the AiService
+     */
+    final class BeanIfExistsToolProviderSupplier implements Supplier<ToolProvider> {
 
         @Override
-        public ToolProviderResult provideTools(ToolProviderRequest request) {
-            // throw new UnsupportedOperationException("should never be called");
-            return new ToolProviderResult(new HashMap<>());
+        public ToolProvider get() {
+            throw new UnsupportedOperationException("should never be called");
         }
     }
 }
