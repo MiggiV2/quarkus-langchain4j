@@ -60,14 +60,14 @@ class ToolProviderTest {
         }
     }
 
-    public static class MiggiAiSupplier implements Supplier<ChatLanguageModel> {
+    public static class TestAiSupplier implements Supplier<ChatLanguageModel> {
         @Override
         public ChatLanguageModel get() {
-            return new MiggiAiModel();
+            return new TestAiModel();
         }
     }
 
-    public static class MiggiAiModel implements ChatLanguageModel {
+    public static class TestAiModel implements ChatLanguageModel {
         @Override
         public Response<AiMessage> generate(List<ChatMessage> messages) {
             return new Response<>(new AiMessage("42"));
@@ -91,7 +91,7 @@ class ToolProviderTest {
         }
     }
 
-    @RegisterAiService(toolProvider = MyCustomToolProvider.class, chatLanguageModelSupplier = MiggiAiSupplier.class)
+    @RegisterAiService(toolProvider = MyCustomToolProvider.class, chatLanguageModelSupplier = TestAiSupplier.class)
     interface MyServiceWithToolProvider {
         String chat(@UserMessage String msg, @MemoryId Object id);
     }

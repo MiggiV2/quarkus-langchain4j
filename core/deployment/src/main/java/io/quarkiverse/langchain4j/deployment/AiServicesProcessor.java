@@ -61,10 +61,10 @@ import org.objectweb.asm.tree.analysis.AnalyzerException;
 import dev.langchain4j.exception.IllegalConfigurationException;
 import dev.langchain4j.service.Moderate;
 import dev.langchain4j.service.output.ServiceOutputParser;
-import dev.langchain4j.service.tool.ToolProvider;
 import io.quarkiverse.langchain4j.ModelName;
 import io.quarkiverse.langchain4j.ToolBox;
 import io.quarkiverse.langchain4j.deployment.config.LangChain4jBuildConfig;
+import io.quarkiverse.langchain4j.deployment.devui.ToolProviderInfo;
 import io.quarkiverse.langchain4j.deployment.items.MethodParameterAllowedAnnotationsBuildItem;
 import io.quarkiverse.langchain4j.deployment.items.MethodParameterIgnoredAnnotationsBuildItem;
 import io.quarkiverse.langchain4j.deployment.items.SelectedChatModelProviderBuildItem;
@@ -209,6 +209,7 @@ public class AiServicesProcessor {
             BuildProducer<RequestModerationModelBeanBuildItem> requestModerationModelBeanProducer,
             BuildProducer<RequestImageModelBeanBuildItem> requestImageModelBeanProducer,
             BuildProducer<DeclarativeAiServiceBuildItem> declarativeAiServiceProducer,
+            BuildProducer<ToolProviderMetaBuildItem> toolProviderProducer,
             BuildProducer<ReflectiveClassBuildItem> reflectiveClassProducer,
             BuildProducer<GeneratedClassBuildItem> generatedClassProducer) {
         IndexView index = indexBuildItem.getIndex();
@@ -216,6 +217,7 @@ public class AiServicesProcessor {
         Set<String> chatModelNames = new HashSet<>();
         Set<String> moderationModelNames = new HashSet<>();
         Set<String> imageModelNames = new HashSet<>();
+        List<ToolProviderInfo> toolProviderInfos = new ArrayList<>();
         ClassOutput generatedClassOutput = new GeneratedClassGizmoAdaptor(generatedClassProducer, true);
         for (AnnotationInstance instance : index.getAnnotations(LangChain4jDotNames.REGISTER_AI_SERVICES)) {
             if (instance.target().kind() != AnnotationTarget.Kind.CLASS) {
@@ -324,11 +326,13 @@ public class AiServicesProcessor {
                 validateSupplierAndRegisterForReflection(moderationModelSupplierClassName, index, reflectiveClassProducer);
             }
 
-            DotName toolProviderSupplierClassName = null;
-            AnnotationValue toolProviderSupplierValue = instance.value("toolProvider");
-            if (toolProviderSupplierValue != null) {
-                toolProviderSupplierClassName = toolProviderSupplierValue.asClass().name();
-                validateSupplierAndRegisterForReflection(toolProviderSupplierClassName, index, reflectiveClassProducer);
+            DotName toolProviderClassName = null;
+            AnnotationValue toolProviderValue = instance.value("toolProvider");
+            if (toolProviderValue != null) {
+                toolProviderClassName = toolProviderValue.asClass().name();
+                validateSupplierAndRegisterForReflection(toolProviderClassName, index, reflectiveClassProducer);
+                toolProviderInfos.add(new ToolProviderInfo(toolProviderClassName.toString(),
+                        declarativeAiServiceClassInfo.simpleName()));
             }
 
             DotName imageModelSupplierClassName = LangChain4jDotNames.BEAN_IF_EXISTS_IMAGE_MODEL_SUPPLIER;
@@ -390,8 +394,9 @@ public class AiServicesProcessor {
                             chatModelName,
                             moderationModelName,
                             imageModelName,
-                            toolProviderSupplierClassName));
+                            toolProviderClassName));
         }
+        toolProviderProducer.produce(new ToolProviderMetaBuildItem(toolProviderInfos));
 
         for (String chatModelName : chatModelNames) {
             requestChatModelBeanProducer.produce(new RequestChatModelBeanBuildItem(chatModelName));
@@ -723,7 +728,7 @@ public class AiServicesProcessor {
             unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(LangChain4jDotNames.IMAGE_MODEL));
         }
         if (!allToolProviders.isEmpty()) {
-            unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(DotName.createSimple(ToolProvider.class)));
+            unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(allToolProviders));
         }
         if (!allToolNames.isEmpty()) {
             unremoveableProducer.produce(UnremovableBeanBuildItem.beanTypes(allToolNames));

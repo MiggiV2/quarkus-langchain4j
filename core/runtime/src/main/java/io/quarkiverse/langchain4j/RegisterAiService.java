@@ -5,7 +5,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.HashMap;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -74,7 +73,7 @@ public @interface RegisterAiService {
      * If not set, the default model (i.e. the one configured without setting the model name) is used.
      * An example of the default model configuration is the following:
      * {@code quarkus.langchain4j.openai.chat-model.model-name=gpt-4-turbo-preview}
-     *
+     * <p>
      * If set, it uses the model configured by name. For example if this is set to {@code somename}
      * an example configuration value for that named model could be:
      * {@code quarkus.langchain4j.somename.openai.chat-model.model-name=gpt-4-turbo-preview}
@@ -122,7 +121,7 @@ public @interface RegisterAiService {
      * typically it will, so consider adding a bean-defining annotation to
      * it). If it is not a CDI bean, Quarkus will create an instance
      * by calling its no-arg constructor.
-     *
+     * <p>
      * If unspecified, Quarkus will attempt to locate a CDI bean that
      * implements {@link RetrievalAugmentor} and use it if one exists.
      */
@@ -146,6 +145,9 @@ public @interface RegisterAiService {
      */
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
+    /**
+     * Configures a toolProvider. Either a toolProvider or "normal" tools can be used, but not both
+     */
     Class<? extends ToolProvider> toolProvider() default BeanIfExistsToolProviderSupplier.class;
 
     /**
@@ -271,13 +273,15 @@ public @interface RegisterAiService {
         }
     }
 
+    /**
+     * Default toolProvider that does not provide any tools
+     */
     @ApplicationScoped
     final class BeanIfExistsToolProviderSupplier implements ToolProvider {
 
         @Override
         public ToolProviderResult provideTools(ToolProviderRequest request) {
-            // throw new UnsupportedOperationException("should never be called");
-            return new ToolProviderResult(new HashMap<>());
+            return ToolProviderResult.builder().build();
         }
     }
 }
