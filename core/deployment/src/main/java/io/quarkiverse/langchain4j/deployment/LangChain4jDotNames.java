@@ -109,4 +109,5 @@ public class LangChain4jDotNames {
     static final DotName WEB_SEARCH_ENGINE = DotName.createSimple(WebSearchEngine.class);
     static final DotName IMAGE = DotName.createSimple(Image.class);
     static final DotName RESULT = DotName.createSimple(Result.class);
+    static final DotName TOOL_PROVIDER = DotName.createSimple(ToolProcessor.class);
 }

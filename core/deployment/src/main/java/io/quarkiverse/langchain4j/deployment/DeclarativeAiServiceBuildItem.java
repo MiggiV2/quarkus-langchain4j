@@ -1,10 +1,11 @@
 package io.quarkiverse.langchain4j.deployment;
 
-import io.quarkus.builder.item.MultiBuildItem;
+import java.util.List;
+
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 
-import java.util.List;
+import io.quarkus.builder.item.MultiBuildItem;
 
 /**
  * Represents the metadata collected from the usages of {@link io.quarkiverse.langchain4j.RegisterAiService}

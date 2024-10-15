@@ -1,5 +1,13 @@
 package io.quarkiverse.langchain4j;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.List;
+import java.util.function.Supplier;
+
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
@@ -15,14 +23,6 @@ import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.quarkiverse.langchain4j.audit.AuditService;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.util.List;
-import java.util.function.Supplier;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Used to create LangChain4j's {@link AiServices} in a declarative manner that the application can then use simply by
@@ -142,9 +142,9 @@ public @interface RegisterAiService {
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
     /**
-     * Configures a toolProvider. Either a toolProvider or "normal" tools can be used, but not both
+     * Configures a toolProviderSupplier. Either a toolProviderSupplier or "normal" tools can be used, but not both
      */
-    Class<? extends Supplier<ToolProvider>> toolProvider() default BeanIfExistsToolProviderSupplier.class;
+    Class<? extends Supplier<ToolProvider>> toolProviderSupplier() default BeanIfExistsToolProviderSupplier.class;
 
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
@@ -270,7 +270,7 @@ public @interface RegisterAiService {
     }
 
     /**
-     * Marker that is used when the user does not want any toolProvider for the AiService
+     * Marker that is used when the user does not want any toolProviderSupplier for the AiService
      */
     final class BeanIfExistsToolProviderSupplier implements Supplier<ToolProvider> {
 
