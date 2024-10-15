@@ -37,40 +37,22 @@ class ToolProviderTest {
     @Inject
     MyServiceWithToolProvider myServiceWithTools;
 
-    /*
-     * @Inject
-     * MyServiceWithoutToolProvider myServiceWithoutTools;
-     *
-     */
-
-    @ApplicationScoped
-    public static class MyCustomToolProviderSupplier implements Supplier<ToolProvider> {
-        @Inject
-        MyCustomToolProvider myCustomToolProvider;
-
-        @Override
-        public ToolProvider get() {
-            return myCustomToolProvider;
-        }
-    }
+    @Inject
+    MyServiceWithoutToolProvider myServiceWithoutTools;
 
     @ApplicationScoped
     public static class MyCustomToolProvider implements ToolProvider {
-        /*
-         * @Inject
-         * MyServiceWithoutToolProvider myServiceWithoutTools;
-         *
-         */
+        @Inject
+        MyServiceWithoutToolProvider myServiceWithoutTools;
 
         @Override
         public ToolProviderResult provideTools(ToolProviderRequest request) {
-            // assertNotNull(myServiceWithoutTools, "An injected service, should not be null.");
-
+            String simpleAnswer = myServiceWithoutTools.chat("Hi");
+            assertEquals("42", simpleAnswer);
             ToolSpecification toolSpecification = ToolSpecification.builder()
                     .name("get_booking_details")
                     .description("Returns booking details")
                     .build();
-
             ToolExecutor toolExecutor = (t, m) -> "0";
             return ToolProviderResult.builder()
                     .add(toolSpecification, toolExecutor)
@@ -109,18 +91,15 @@ class ToolProviderTest {
         }
     }
 
-    @RegisterAiService(toolProviderSupplier = MyCustomToolProviderSupplier.class, chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class, chatLanguageModelSupplier = TestAiSupplier.class)
+    @RegisterAiService(toolProvider = MyCustomToolProvider.class, chatLanguageModelSupplier = TestAiSupplier.class)
     interface MyServiceWithToolProvider {
         String chat(@UserMessage String msg, @MemoryId Object id);
     }
 
-    /*
-     * @RegisterAiService(chatLanguageModelSupplier = TestAiSupplier.class, chatMemoryProviderSupplier =
-     * RegisterAiService.NoChatMemoryProviderSupplier.class)
-     * interface MyServiceWithoutToolProvider {
-     * String chat(String msg);
-     * }
-     */
+    @RegisterAiService(chatLanguageModelSupplier = BlockingChatLanguageModelSupplierTest.MyModelSupplier.class, chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class)
+    interface MyServiceWithoutToolProvider {
+        String chat(String msg);
+    }
 
     @RegisterExtension
     static final QuarkusUnitTest unitTest = new QuarkusUnitTest()
@@ -134,14 +113,11 @@ class ToolProviderTest {
         String answer = myServiceWithTools.chat("hello", 1);
         assertEquals("0", answer);
     }
-    /*
-     * @Test
-     *
-     * @ActivateRequestContext
-     * void testCallNoTools() {
-     * String answer = myServiceWithoutTools.chat("hello");
-     * assertEquals("42", answer);
-     * }
-     *
-     */
+
+    @Test
+    @ActivateRequestContext
+    void testCallNoTools() {
+        String answer = myServiceWithoutTools.chat("hello");
+        assertEquals("42", answer);
+    }
 }

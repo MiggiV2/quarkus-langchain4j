@@ -21,6 +21,7 @@ import dev.langchain4j.model.image.ImageModel;
 import dev.langchain4j.model.moderation.ModerationModel;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
+import dev.langchain4j.service.tool.ToolProvider;
 import io.quarkiverse.langchain4j.ModelName;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -158,15 +159,13 @@ public class AiServicesRecorder {
                         quarkusAiServices.tools(tools);
                     }
 
-                    /*
-                     * if (info.toolProviderSupplier() != null) {
-                     * Supplier<? extends ToolProvider> supplier = (Supplier<? extends ToolProvider>) Thread
-                     * .currentThread().getContextClassLoader()
-                     * .loadClass(info.toolProviderSupplier())
-                     * .getConstructor().newInstance();
-                     * quarkusAiServices.toolProvider(supplier.get());
-                     * }
-                     */
+                    if (info.toolProvider() != null) {
+                        Class<?> toolProviderClass = Thread.currentThread().getContextClassLoader()
+                                .loadClass(info.toolProvider());
+                        ToolProvider toolProvider = (ToolProvider) creationalContext.getInjectedReference(toolProviderClass);
+                        quarkusAiServices.toolProvider(toolProvider);
+                    }
+
                     if (info.chatMemoryProviderSupplierClassName() != null) {
                         if (RegisterAiService.BeanChatMemoryProviderSupplier.class.getName()
                                 .equals(info.chatMemoryProviderSupplierClassName())) {

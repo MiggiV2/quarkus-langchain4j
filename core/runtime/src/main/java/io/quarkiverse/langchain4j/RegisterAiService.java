@@ -8,6 +8,8 @@ import java.lang.annotation.Target;
 import java.util.List;
 import java.util.function.Supplier;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
@@ -20,6 +22,8 @@ import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.ToolProvider;
+import dev.langchain4j.service.tool.ToolProviderRequest;
+import dev.langchain4j.service.tool.ToolProviderResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -142,9 +146,9 @@ public @interface RegisterAiService {
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
     /**
-     * Configures a toolProviderSupplier. Either a toolProviderSupplier or "normal" tools can be used, but not both
+     * Configures a toolProvider. Either a toolProvider or "normal" tools can be used, but not both
      */
-    Class<? extends Supplier<ToolProvider>> toolProviderSupplier() default BeanIfExistsToolProviderSupplier.class;
+    Class<? extends ToolProvider> toolProvider() default BeanIfExistsToolProviderSupplier.class;
 
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
@@ -270,13 +274,14 @@ public @interface RegisterAiService {
     }
 
     /**
-     * Marker that is used when the user does not want any toolProviderSupplier for the AiService
+     * Default toolProvider that does not provide any tools
      */
-    final class BeanIfExistsToolProviderSupplier implements Supplier<ToolProvider> {
+    @ApplicationScoped
+    final class BeanIfExistsToolProviderSupplier implements ToolProvider {
 
         @Override
-        public ToolProvider get() {
-            throw new UnsupportedOperationException("should never be called");
+        public ToolProviderResult provideTools(ToolProviderRequest request) {
+            return ToolProviderResult.builder().build();
         }
     }
 }

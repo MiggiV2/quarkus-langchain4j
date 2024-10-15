@@ -1,17 +1,5 @@
 package io.quarkiverse.langchain4j.runtime.devui;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
-
-import jakarta.enterprise.context.control.ActivateRequestContext;
-
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -33,6 +21,7 @@ import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.service.tool.ToolProviderRequest;
 import dev.langchain4j.service.tool.ToolProviderResult;
+import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.runtime.ToolsRecorder;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatMessagePojo;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatResultPojo;
@@ -48,6 +37,17 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import io.smallrye.mutiny.subscription.MultiEmitter;
 import io.vertx.core.json.JsonObject;
+import jakarta.enterprise.context.control.ActivateRequestContext;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 @ActivateRequestContext
 public class ChatJsonRPCService {
@@ -69,12 +69,12 @@ public class ChatJsonRPCService {
     private final ToolProvider toolProvider;
 
     public ChatJsonRPCService(@All List<ChatLanguageModel> models, // don't use ChatLanguageModel model because it results in the default model not being configured
-            @All List<StreamingChatLanguageModel> streamingModels,
-            @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
-            @All List<RetrievalAugmentor> retrievalAugmentors,
-            ChatMemoryProvider memoryProvider,
-            QuarkusToolExecutorFactory toolExecutorFactory,
-            @All List<ToolProvider> toolProviders) {
+                              @All List<StreamingChatLanguageModel> streamingModels,
+                              @All List<Supplier<RetrievalAugmentor>> retrievalAugmentorSuppliers,
+                              @All List<RetrievalAugmentor> retrievalAugmentors,
+                              ChatMemoryProvider memoryProvider,
+                              QuarkusToolExecutorFactory toolExecutorFactory,
+                              @All List<ToolProvider> toolProviders) {
         this.toolProvider = getToolProvider(toolProviders);
         this.model = models.get(0);
         this.streamingModel = streamingModels.isEmpty() ? Optional.empty() : Optional.of(streamingModels.get(0));
@@ -235,7 +235,7 @@ public class ChatJsonRPCService {
 
             ToolProviderRequest toolRequest = new ToolProviderRequest(memory, userMessage);
             ToolProviderResult toolsResult = toolProvider.provideTools(toolRequest);
-            // The default toolProviderSupplier will return only an empty list
+            // The default toolProvider will return only an empty list
             for (ToolSpecification specification : toolsResult.tools().keySet()) {
                 toolSpecifications.add(specification);
                 toolExecutors.put(specification.name(), toolsResult.tools().get(specification));
@@ -248,7 +248,7 @@ public class ChatJsonRPCService {
             } else {
                 executeWithTools(memory);
             }
-            // Remove toolProviderSupplier tools again
+            // Remove toolProvider tools again
             if (!toolsResult.tools().isEmpty()) {
                 toolSpecifications.clear();
                 toolExecutors.clear();
@@ -295,8 +295,8 @@ public class ChatJsonRPCService {
     }
 
     private void executeWithToolsAndStreaming(ChatMemory memory,
-            MultiEmitter<? super JsonObject> em,
-            int toolExecutionsLeft) {
+                                              MultiEmitter<? super JsonObject> em,
+                                              int toolExecutionsLeft) {
         toolExecutionsLeft--;
         if (toolExecutionsLeft == 0) {
             throw new RuntimeException(
@@ -347,7 +347,7 @@ public class ChatJsonRPCService {
 
     private ToolProvider getToolProvider(List<ToolProvider> toolProviders) {
         for (ToolProvider currentProvider : toolProviders) {
-            boolean isDefault = false; // currentProvider instanceof RegisterAiService.BeanIfExistsToolProviderSupplier;
+            boolean isDefault = currentProvider instanceof RegisterAiService.BeanIfExistsToolProviderSupplier;
             if (!isDefault) {
                 return currentProvider;
             }
