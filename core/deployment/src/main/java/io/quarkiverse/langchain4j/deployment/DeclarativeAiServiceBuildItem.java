@@ -1,11 +1,10 @@
 package io.quarkiverse.langchain4j.deployment;
 
-import java.util.List;
-
+import io.quarkus.builder.item.MultiBuildItem;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 
-import io.quarkus.builder.item.MultiBuildItem;
+import java.util.List;
 
 /**
  * Represents the metadata collected from the usages of {@link io.quarkiverse.langchain4j.RegisterAiService}
@@ -16,7 +15,7 @@ public final class DeclarativeAiServiceBuildItem extends MultiBuildItem {
     private final DotName chatLanguageModelSupplierClassDotName;
     private final DotName streamingChatLanguageModelSupplierClassDotName;
     private final List<DotName> toolDotNames;
-    private final DotName toolProviderSupperClassDotName;
+    private final DotName toolProviderClassDotName;
 
     private final DotName chatMemoryProviderSupplierClassDotName;
     private final DotName retrieverClassDotName;
@@ -65,7 +64,7 @@ public final class DeclarativeAiServiceBuildItem extends MultiBuildItem {
         this.chatModelName = chatModelName;
         this.moderationModelName = moderationModelName;
         this.imageModelName = imageModelName;
-        this.toolProviderSupperClassDotName = toolProviderSupplierClassDotName;
+        this.toolProviderClassDotName = toolProviderSupplierClassDotName;
     }
 
     public ClassInfo getServiceClassInfo() {
@@ -132,7 +131,7 @@ public final class DeclarativeAiServiceBuildItem extends MultiBuildItem {
         return imageModelName;
     }
 
-    public DotName getToolProviderSupperClassDotName() {
-        return toolProviderSupperClassDotName;
+    public DotName getToolProviderClassDotName() {
+        return toolProviderClassDotName;
     }
 }
