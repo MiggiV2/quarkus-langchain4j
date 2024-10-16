@@ -32,7 +32,7 @@ export class QwcTools extends LitElement {
     }
 
     render() {
-        if (this._toolProviders) {
+        if (this._toolProviders.length > 0) {
             return this._renderToolProvider();
         } else if (this._tools) {
             return this._renderToolTable();
