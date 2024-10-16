@@ -28,6 +28,7 @@ public class LangChain4jDevUIProcessor {
 
     @BuildStep(onlyIf = IsDevelopment.class)
     CardPageBuildItem cardPage(List<DeclarativeAiServiceBuildItem> aiServices,
+            // List<ToolProvider> toolProviders,
             ToolsMetadataBuildItem toolsMetadataBuildItem,
             List<EmbeddingModelProviderCandidateBuildItem> embeddingModelCandidateBuildItems,
             List<InProcessEmbeddingBuildItem> inProcessEmbeddingModelBuildItems,
@@ -60,6 +61,13 @@ public class LangChain4jDevUIProcessor {
 
             additionalDevUiCardBuildItem.getBuildTimeData().forEach((k, v) -> card.addBuildTimeData(k, v));
         }
+
+        List<ToolProviderInfo> toolProviderInfos = List
+                .of(new ToolProviderInfo("org.langchain4j-quarkus.dummyClass", "dummyTool"));
+        if (!toolProviderInfos.isEmpty()) {
+            card.addBuildTimeData("toolProviders", toolProviderInfos);
+        }
+
         return card;
     }
 
