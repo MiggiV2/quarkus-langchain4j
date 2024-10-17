@@ -159,15 +159,13 @@ public class AiServicesRecorder {
                         quarkusAiServices.tools(tools);
                     }
 
-                    if (info.toolProvider() != null) {
-                        if (!RegisterAiService.BeanIfExistsToolProviderSupplier.class.getName()
-                                .equals(info.toolProvider())) {
-                            Class<?> toolProviderClass = Thread.currentThread().getContextClassLoader()
-                                    .loadClass(info.toolProvider());
-                            Supplier<? extends ToolProvider> toolProvider = (Supplier<? extends ToolProvider>) creationalContext
-                                    .getInjectedReference(toolProviderClass);
-                            quarkusAiServices.toolProvider(toolProvider.get());
-                        }
+                    if (!RegisterAiService.BeanIfExistsToolProviderSupplier.class.getName()
+                            .equals(info.toolProvider())) {
+                        Class<?> toolProviderClass = Thread.currentThread().getContextClassLoader()
+                                .loadClass(info.toolProvider());
+                        Supplier<? extends ToolProvider> toolProvider = (Supplier<? extends ToolProvider>) creationalContext
+                                .getInjectedReference(toolProviderClass);
+                        quarkusAiServices.toolProvider(toolProvider.get());
                     }
 
                     if (info.chatMemoryProviderSupplierClassName() != null) {

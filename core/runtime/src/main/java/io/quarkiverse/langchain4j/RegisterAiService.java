@@ -8,8 +8,6 @@ import java.lang.annotation.Target;
 import java.util.List;
 import java.util.function.Supplier;
 
-import jakarta.enterprise.context.ApplicationScoped;
-
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
@@ -274,7 +272,6 @@ public @interface RegisterAiService {
     /**
      * Default toolProvider that does not provide any tools
      */
-    @ApplicationScoped
     final class BeanIfExistsToolProviderSupplier implements Supplier<ToolProvider> {
 
         @Override

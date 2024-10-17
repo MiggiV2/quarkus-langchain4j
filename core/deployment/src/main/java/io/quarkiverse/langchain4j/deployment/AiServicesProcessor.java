@@ -62,6 +62,7 @@ import dev.langchain4j.exception.IllegalConfigurationException;
 import dev.langchain4j.service.Moderate;
 import dev.langchain4j.service.output.ServiceOutputParser;
 import io.quarkiverse.langchain4j.ModelName;
+import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.ToolBox;
 import io.quarkiverse.langchain4j.deployment.config.LangChain4jBuildConfig;
 import io.quarkiverse.langchain4j.deployment.devui.ToolProviderInfo;
@@ -689,7 +690,8 @@ public class AiServicesProcessor {
                 needsImageModelBean = true;
             }
 
-            if (toolProviderSupplierClassName != null) {
+            if (!RegisterAiService.BeanIfExistsToolProviderSupplier.class.getName()
+                    .equals(toolProviderSupplierClassName)) {
                 DotName toolProvider = DotName.createSimple(toolProviderSupplierClassName);
                 configurator.addInjectionPoint(ClassType.create(toolProvider));
                 allToolProviders.add(toolProvider);
