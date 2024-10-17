@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class ToolProviderTest {
     @Inject
-    MyServiceWithToolProvider myServiceWithTools;
+    MyServiceWithCustomToolProvider myServiceWithTools;
 
     @Inject
     MyServiceWithoutToolProvider myServiceWithoutTools;
@@ -47,7 +47,7 @@ class ToolProviderTest {
         @Override
         public ToolProviderResult provideTools(ToolProviderRequest request) {
             assertNotNull(myServiceWithoutTools);
-            
+
             ToolSpecification toolSpecification = ToolSpecification.builder()
                     .name("get_booking_details")
                     .description("Returns booking details")
@@ -91,7 +91,7 @@ class ToolProviderTest {
     }
 
     @RegisterAiService(toolProvider = MyCustomToolProvider.class, chatLanguageModelSupplier = TestAiSupplier.class)
-    interface MyServiceWithToolProvider {
+    interface MyServiceWithCustomToolProvider {
         String chat(@UserMessage String msg, @MemoryId Object id);
     }
 
@@ -103,7 +103,7 @@ class ToolProviderTest {
     @RegisterExtension
     static final QuarkusUnitTest unitTest = new QuarkusUnitTest()
             .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClasses(MyServiceWithToolProvider.class, MyCustomToolProvider.class,
+                    .addClasses(MyServiceWithCustomToolProvider.class, MyCustomToolProvider.class,
                             BlockingChatLanguageModelSupplierTest.MyModelSupplier.class));
 
     @Test
