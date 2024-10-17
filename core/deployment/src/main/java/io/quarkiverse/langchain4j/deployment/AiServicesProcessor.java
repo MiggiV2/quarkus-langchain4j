@@ -326,7 +326,7 @@ public class AiServicesProcessor {
                 validateSupplierAndRegisterForReflection(moderationModelSupplierClassName, index, reflectiveClassProducer);
             }
 
-            DotName toolProviderClassName = null;
+            DotName toolProviderClassName = LangChain4jDotNames.BEAN_IF_EXISTS_TOOL_PROVIDER_SUPPLIER;
             AnnotationValue toolProviderValue = instance.value("toolProvider");
             if (toolProviderValue != null) {
                 toolProviderClassName = toolProviderValue.asClass().name();

@@ -22,8 +22,6 @@ import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.retriever.Retriever;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.ToolProvider;
-import dev.langchain4j.service.tool.ToolProviderRequest;
-import dev.langchain4j.service.tool.ToolProviderResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.quarkiverse.langchain4j.audit.AuditService;
@@ -148,7 +146,7 @@ public @interface RegisterAiService {
     /**
      * Configures a toolProvider. Either a toolProvider or "normal" tools can be used, but not both
      */
-    Class<? extends ToolProvider> toolProvider() default BeanIfExistsToolProviderSupplier.class;
+    Class<? extends Supplier<ToolProvider>> toolProvider() default BeanIfExistsToolProviderSupplier.class;
 
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
@@ -277,11 +275,11 @@ public @interface RegisterAiService {
      * Default toolProvider that does not provide any tools
      */
     @ApplicationScoped
-    final class BeanIfExistsToolProviderSupplier implements ToolProvider {
+    final class BeanIfExistsToolProviderSupplier implements Supplier<ToolProvider> {
 
         @Override
-        public ToolProviderResult provideTools(ToolProviderRequest request) {
-            return ToolProviderResult.builder().build();
+        public ToolProvider get() {
+            throw new UnsupportedOperationException("should never be called");
         }
     }
 }

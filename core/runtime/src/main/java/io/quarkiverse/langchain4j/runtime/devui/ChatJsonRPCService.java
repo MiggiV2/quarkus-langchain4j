@@ -33,7 +33,6 @@ import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import dev.langchain4j.service.tool.ToolProviderRequest;
 import dev.langchain4j.service.tool.ToolProviderResult;
-import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.runtime.ToolsRecorder;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatMessagePojo;
 import io.quarkiverse.langchain4j.runtime.devui.json.ChatResultPojo;
@@ -348,7 +347,7 @@ public class ChatJsonRPCService {
 
     private ToolProvider getToolProvider(List<ToolProvider> toolProviders) {
         for (ToolProvider currentProvider : toolProviders) {
-            boolean isDefault = currentProvider instanceof RegisterAiService.BeanIfExistsToolProviderSupplier;
+            boolean isDefault = false; //currentProvider instanceof RegisterAiService.BeanIfExistsToolProviderSupplier;
             if (!isDefault) {
                 return currentProvider;
             }
