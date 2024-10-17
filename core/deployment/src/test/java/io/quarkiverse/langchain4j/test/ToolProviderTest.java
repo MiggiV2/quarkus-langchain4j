@@ -103,7 +103,7 @@ class ToolProviderTest {
         }
     }
 
-    @RegisterAiService(toolProvider = MyCustomToolProviderSupplier.class, chatLanguageModelSupplier = TestAiSupplier.class)
+    @RegisterAiService(toolProviderSupplier = MyCustomToolProviderSupplier.class, chatLanguageModelSupplier = TestAiSupplier.class)
     interface MyServiceWithCustomToolProvider {
         String chat(@UserMessage String msg, @MemoryId Object id);
     }

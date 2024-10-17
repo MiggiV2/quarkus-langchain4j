@@ -160,9 +160,9 @@ public class AiServicesRecorder {
                     }
 
                     if (!RegisterAiService.BeanIfExistsToolProviderSupplier.class.getName()
-                            .equals(info.toolProvider())) {
+                            .equals(info.toolProviderSupplier())) {
                         Class<?> toolProviderClass = Thread.currentThread().getContextClassLoader()
-                                .loadClass(info.toolProvider());
+                                .loadClass(info.toolProviderSupplier());
                         Supplier<? extends ToolProvider> toolProvider = (Supplier<? extends ToolProvider>) creationalContext
                                 .getInjectedReference(toolProviderClass);
                         quarkusAiServices.toolProvider(toolProvider.get());

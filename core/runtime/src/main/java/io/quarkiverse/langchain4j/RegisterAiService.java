@@ -142,9 +142,9 @@ public @interface RegisterAiService {
     Class<? extends Supplier<ModerationModel>> moderationModelSupplier() default BeanIfExistsModerationModelSupplier.class;
 
     /**
-     * Configures a toolProvider. Either a toolProvider or "normal" tools can be used, but not both
+     * Configures a toolProviderSupplier. Either a toolProviderSupplier or "normal" tools can be used, but not both
      */
-    Class<? extends Supplier<ToolProvider>> toolProvider() default BeanIfExistsToolProviderSupplier.class;
+    Class<? extends Supplier<ToolProvider>> toolProviderSupplier() default BeanIfExistsToolProviderSupplier.class;
 
     /**
      * Marker that is used to tell Quarkus to use the {@link ChatLanguageModel} that has been configured as a CDI bean by
@@ -270,7 +270,7 @@ public @interface RegisterAiService {
     }
 
     /**
-     * Default toolProvider that does not provide any tools
+     * Default toolProviderSupplier that does not provide any tools
      */
     final class BeanIfExistsToolProviderSupplier implements Supplier<ToolProvider> {
 

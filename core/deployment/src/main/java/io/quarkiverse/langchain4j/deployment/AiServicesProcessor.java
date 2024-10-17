@@ -328,7 +328,7 @@ public class AiServicesProcessor {
             }
 
             DotName toolProviderClassName = LangChain4jDotNames.BEAN_IF_EXISTS_TOOL_PROVIDER_SUPPLIER;
-            AnnotationValue toolProviderValue = instance.value("toolProvider");
+            AnnotationValue toolProviderValue = instance.value("toolProviderSupplier");
             if (toolProviderValue != null) {
                 toolProviderClassName = toolProviderValue.asClass().name();
                 validateSupplierAndRegisterForReflection(toolProviderClassName, index, reflectiveClassProducer);
@@ -691,7 +691,7 @@ public class AiServicesProcessor {
             }
 
             if (!RegisterAiService.BeanIfExistsToolProviderSupplier.class.getName()
-                    .equals(toolProviderSupplierClassName)) {
+                    .equals(toolProviderSupplierClassName) && toolProviderSupplierClassName != null) {
                 DotName toolProvider = DotName.createSimple(toolProviderSupplierClassName);
                 configurator.addInjectionPoint(ClassType.create(toolProvider));
                 allToolProviders.add(toolProvider);
